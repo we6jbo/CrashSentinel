@@ -1,0 +1,17 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: context_provenance.h
+# generated: 2026-09-07T15:40:07-07:00
+
+--- before/context_provenance.h
++++ after/context_provenance.h
+@@ -1,5 +1,9 @@
+ // #ju56Us
+ #pragma once
++// READ ME: defines the small machine-context/provenance contract used when
++// CrashSentinel writes its own metadata. It deliberately honors the external
++// time-visibility policy instead of inventing a visible clock time.
++
+ #include <QString>
+ 
+ struct MachineContext {

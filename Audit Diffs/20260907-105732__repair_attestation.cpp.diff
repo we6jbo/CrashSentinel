@@ -1,0 +1,198 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: repair_attestation.cpp
+# generated: 2026-09-07T10:57:32-07:00
+
+--- /dev/null
++++ after/repair_attestation.cpp
+@@ -0,0 +1,190 @@
++// #ju56Us
++#include "repair_attestation.h"
++#include "context_provenance.h"
++
++#include <QCryptographicHash>
++#include <QDateTime>
++#include <QDir>
++#include <QFile>
++#include <QJsonArray>
++#include <QJsonDocument>
++#include <QJsonObject>
++#include <QRandomGenerator>
++#include <QSaveFile>
++
++
++static qint64 monotonicMillisSinceBoot()
++{
++    QFile f(QStringLiteral("/proc/uptime"));
++    if (!f.open(QIODevice::ReadOnly))
++        return -1;
++
++    const QByteArray first = f.readLine().split(' ').value(0);
++    bool ok = false;
++    const double seconds = first.toDouble(&ok);
++    return ok ? qint64(seconds * 1000.0) : -1;
++}
++
++QByteArray RepairAttestation::hmacSha256(const QByteArray &keyIn,
++                                         const QByteArray &message)
++{
++    QByteArray key = keyIn;
++    constexpr int blockSize = 64;
++
++    if (key.size() > blockSize)
++        key = QCryptographicHash::hash(key, QCryptographicHash::Sha256);
++    key = key.leftJustified(blockSize, '\0', true);
++
++    QByteArray oPad(blockSize, char(0x5c));
++    QByteArray iPad(blockSize, char(0x36));
++
++    for (int i = 0; i < blockSize; ++i) {
++        oPad[i] = char(quint8(oPad[i]) ^ quint8(key[i]));
++        iPad[i] = char(quint8(iPad[i]) ^ quint8(key[i]));
++    }
++
++    const QByteArray inner =
++        QCryptographicHash::hash(iPad + message, QCryptographicHash::Sha256);
++    return QCryptographicHash::hash(oPad + inner, QCryptographicHash::Sha256);
++}
++
++QByteArray RepairAttestation::loadOrCreateSecret(const QString &stateDir,
++                                                 QString *errorMessage)
++{
++    const QString path = QDir(stateDir).filePath(QStringLiteral("repair-attestation.key"));
++
++    QFile existing(path);
++    if (existing.open(QIODevice::ReadOnly)) {
++        const QByteArray encoded = existing.readAll().trimmed();
++        const QByteArray decoded = QByteArray::fromHex(encoded);
++        if (decoded.size() == 32)
++            return decoded;
++    }
++
++    QByteArray secret(32, '\0');
++    for (int i = 0; i < 32; i += 8) {
++        const quint64 r = QRandomGenerator::system()->generate64();
++        for (int j = 0; j < 8 && i + j < 32; ++j)
++            secret[i + j] = char((r >> (j * 8)) & 0xff);
++    }
++
++    QSaveFile out(path);
++    if (!out.open(QIODevice::WriteOnly)) {
++        if (errorMessage)
++            *errorMessage = QStringLiteral("Could not create attestation key: %1")
++                                .arg(out.errorString());
++        return {};
++    }
++    out.write(secret.toHex());
++    out.write("\n");
++    if (!out.commit()) {
++        if (errorMessage)
++            *errorMessage = QStringLiteral("Could not commit attestation key.");
++        return {};
++    }
++
++    QFile::setPermissions(path, QFileDevice::ReadOwner | QFileDevice::WriteOwner);
++    return secret;
++}
++
++QString RepairAttestation::bootId()
++{
++    QFile f(QStringLiteral("/proc/sys/kernel/random/boot_id"));
++    if (!f.open(QIODevice::ReadOnly))
++        return QStringLiteral("unknown");
++    return QString::fromUtf8(f.readAll()).trimmed();
++}
++
++bool RepairAttestation::update(const QString &stateDir,
++                               const QString &snapshotSha256,
++                               QString *errorMessage)
++{
++    QDir().mkpath(stateDir);
++
++    const QByteArray secret = loadOrCreateSecret(stateDir, errorMessage);
++    if (secret.isEmpty())
++        return false;
++
++    const QDateTime now = QDateTime::currentDateTime();
++    const QString currentSlot = now.toString(QStringLiteral("yyyy-MM-dd'T'HH"));
++    const QString previousSlot =
++        now.addSecs(-3600).toString(QStringLiteral("yyyy-MM-dd'T'HH"));
++
++    // One token is minted each hour and accepted for two hours. Keeping the
++    // current and previous hourly token gives overlapping two-hour windows:
++    // 08 -> valid through 09:59, 09 -> valid through 10:59, etc.
++    auto makeToken = [&](const QString &slot) {
++        const QByteArray canonical =
++            QByteArray("CrashSentinel|") +
++            ContextProvenance::ProjectId + "|" +
++            ContextProvenance::ProvenanceCode + "|" +
++            slot.toUtf8() + "|" +
++            bootId().toUtf8() + "|" +
++            snapshotSha256.toUtf8();
++
++        return QString::fromLatin1(hmacSha256(secret, canonical).toHex());
++    };
++
++    const MachineContext ctx = ContextProvenance::loadMachineContext();
++
++    QJsonObject doc;
++    doc.insert(QStringLiteral("_audit_tag"), QStringLiteral("#ju56Us"));
++    doc.insert(QStringLiteral("schema"), 1);
++    doc.insert(QStringLiteral("purpose"),
++               QStringLiteral(
++                   "Allows a future repair program to verify that CrashSentinel "
++                   "has recently produced monitoring evidence. This attestation "
++                   "does NOT certify that the computer is fault-free or that an "
++                   "arbitrary repair is safe."));
++    doc.insert(QStringLiteral("project_id"),
++               QString::fromLatin1(ContextProvenance::ProjectId));
++    doc.insert(QStringLiteral("provenance_code"),
++               QString::fromLatin1(ContextProvenance::ProvenanceCode));
++    doc.insert(QStringLiteral("boot_id"), bootId());
++    doc.insert(QStringLiteral("snapshot_sha256"), snapshotSha256);
++    doc.insert(QStringLiteral("algorithm"), QStringLiteral("HMAC-SHA-256"));
++    doc.insert(QStringLiteral("monotonic_milliseconds_since_boot"),
++               monotonicMillisSinceBoot());
++    doc.insert(QStringLiteral("context_date"), ctx.date);
++    doc.insert(QStringLiteral("context_time_visible"), ctx.timeVisible);
++
++    // The hourly slots are used internally but are intentionally not written
++    // in plaintext. This preserves the T14 context contract when time.visible
++    // is false, and avoids leaking an inferred clock time through this file.
++    QJsonArray tokens;
++    for (const QString &slot : {previousSlot, currentSlot}) {
++        QJsonObject w;
++        w.insert(QStringLiteral("token"), makeToken(slot));
++        tokens.append(w);
++    }
++    doc.insert(QStringLiteral("overlapping_two_hour_tokens"), tokens);
++
++    doc.insert(QStringLiteral("verification_notes"),
++               QStringLiteral(
++                   "A verifier computes HMAC candidates for the current and "
++                   "previous hourly slot and accepts either one. Each hourly "
++                   "token is accepted for two hours, creating overlapping "
++                   "windows across hour boundaries. Also require the expected "
++                   "boot_id, a matching snapshot_sha256, and a recent monotonic "
++                   "timestamp. A valid token means CrashSentinel was recently "
++                   "alive and able to write state; it is only a prerequisite "
++                   "signal for repair automation."));
++
++    const QString path =
++        QDir(stateDir).filePath(QStringLiteral("repair-readiness.json"));
++    QSaveFile out(path);
++    if (!out.open(QIODevice::WriteOnly)) {
++        if (errorMessage)
++            *errorMessage = out.errorString();
++        return false;
++    }
++
++    out.write(QJsonDocument(doc).toJson(QJsonDocument::Indented));
++    if (!out.commit()) {
++        if (errorMessage)
++            *errorMessage = QStringLiteral("Could not commit repair readiness file.");
++        return false;
++    }
++
++    return true;
++}

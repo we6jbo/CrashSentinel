@@ -1,0 +1,97 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: crash_monitor.cpp
+# generated: 2026-09-07T15:40:16-07:00
+
+--- before/crash_monitor.cpp
++++ after/crash_monitor.cpp
+@@ -1,4 +1,9 @@
+ // #ju56Us
++// READ ME: core monitoring loop.
++// Important design rule: evidence collection must be lightweight and must not
++// claim a cause that Linux did not record. Severe power, firmware, hardware, or
++// kernel failures can occur before the reason reaches persistent storage.
++
+ #include "crash_monitor.h"
+ #include "context_provenance.h"
+ #include "repair_attestation.h"
+@@ -24,6 +29,7 @@
+ #include <pwd.h>
+ #include <unistd.h>
+ 
++// Monotonic uptime survives wall-clock policy concerns and is suitable for intervals.
+ static QString monotonicSeconds()
+ {
+     QFile f(QStringLiteral("/proc/uptime"));
+@@ -54,6 +60,7 @@
+     return QString::number(uid);
+ }
+ 
++// Measure this process's resident memory so Status can report monitoring impact.
+ static double currentRssMiB()
+ {
+     QFile statm(QStringLiteral("/proc/self/statm"));
+@@ -87,6 +94,7 @@
+     connect(&timer_, &QTimer::timeout, this, &CrashMonitor::collect);
+ }
+ 
++// Always use the shared package-aware state resolver.
+ QString CrashMonitor::stateDir() const
+ {
+     return StatePaths::sharedStateDir();
+@@ -97,6 +105,7 @@
+     return stateDir();
+ }
+ 
++// Run a read-only helper command with a timeout; callers must treat failure as unknown.
+ QString CrashMonitor::run(const QString &program, const QStringList &args, int timeoutMs) const
+ {
+     QProcess p;
+@@ -179,6 +188,7 @@
+         QFile::remove(entries.at(i).absoluteFilePath());
+ }
+ 
++// Keep a bounded rolling snapshot history rather than growing without limit.
+ void CrashMonitor::rotateHistory(const QByteArray &snapshot)
+ {
+     const QString dir =
+@@ -211,6 +221,7 @@
+         tail.toUtf8());
+ }
+ 
++// Classify evidence from the previous boot without claiming unsupported causation.
+ QString CrashMonitor::previousBootAnalysis() const
+ {
+     const QString full =
+@@ -319,6 +330,7 @@
+     return report;
+ }
+ 
++// One analysis per current boot; the boot-id marker prevents duplicate work.
+ void CrashMonitor::analyzePreviousBootOnce()
+ {
+     const QString reports =
+@@ -366,6 +378,7 @@
+         text.toUtf8());
+ }
+ 
++// Persist measured collector cost and execution identity for the GUI/status report.
+ void CrashMonitor::writeServiceHealth(qint64 collectionMs,
+                                       qint64 snapshotBytes,
+                                       const QString &mode,
+@@ -397,6 +410,7 @@
+         QJsonDocument(o).toJson(QJsonDocument::Indented));
+ }
+ 
++// Initialize one monitor session; self-protection has already run in main.cpp.
+ bool CrashMonitor::start()
+ {
+     if (!QDir().mkpath(stateDir()))
+@@ -416,6 +430,7 @@
+     return true;
+ }
+ 
++// MAIN MONITOR LOOP: evaluate resources first, then decide how much work is safe.
+ void CrashMonitor::collect()
+ {
+     QElapsedTimer collectionTimer;

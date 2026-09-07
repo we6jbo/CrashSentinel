@@ -1,0 +1,48 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: recovery_diagnostics.cpp
+# generated: 2026-09-07T15:40:51-07:00
+
+--- before/recovery_diagnostics.cpp
++++ after/recovery_diagnostics.cpp
+@@ -1,4 +1,8 @@
+ // #ju56Us
++// READ ME: recovery/status/export implementation.
++// Prefer reversible operations: inspect first, create a backup before repair,
++// then clear/rebuild only CrashSentinel-owned derived state.
++
+ #include "recovery_diagnostics.h"
+ 
+ #include <QDir>
+@@ -66,6 +70,7 @@
+     return output.split('\n', Qt::SkipEmptyParts);
+ }
+ 
++// Read-only recovery overview: identify quarantine, duplicates, reports, and writable state.
+ RecoveryDiagnosticsStatus RecoveryDiagnostics::inspect(const QString &stateDir)
+ {
+     RecoveryDiagnosticsStatus s;
+@@ -192,6 +197,7 @@
+     return s;
+ }
+ 
++// Delegate quarantine policy to SelfProtection instead of editing JSON ad hoc.
+ bool RecoveryDiagnostics::clearSelfQuarantine(const QString &stateDir,
+                                               QString *error)
+ {
+@@ -246,6 +252,7 @@
+     return true;
+ }
+ 
++// Make a point-in-time copy of CrashSentinel state before modifying derived files.
+ QString RecoveryDiagnostics::createBackup(const QString &stateDir,
+                                           QString *error)
+ {
+@@ -316,6 +323,7 @@
+     return backupDir;
+ }
+ 
++// Produce a user-shareable diagnostic export without altering system configuration.
+ QString RecoveryDiagnostics::exportDiagnosticReport(
+     const QString &stateDir,
+     QString *error)

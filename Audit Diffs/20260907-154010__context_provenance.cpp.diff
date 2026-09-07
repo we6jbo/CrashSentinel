@@ -1,0 +1,33 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: context_provenance.cpp
+# generated: 2026-09-07T15:40:10-07:00
+
+--- before/context_provenance.cpp
++++ after/context_provenance.cpp
+@@ -1,4 +1,9 @@
+ // #ju56Us
++// READ ME: loads machine context, formats only policy-permitted metadata,
++// creates the portable TG/AKA snapshot, and optionally tries one registration.
++// Failure of the optional registry helper does not invalidate the portable
++// snapshot.
++
+ #include "context_provenance.h"
+ #include <QDir>
+ #include <QFile>
+@@ -21,6 +26,7 @@
+         : e;
+ }
+ 
++// Read external machine context and enforce the time-visible policy immediately.
+ MachineContext ContextProvenance::loadMachineContext() {
+     MachineContext c; c.sourcePath=contextPath();
+     QFile f(c.sourcePath); if(!f.open(QIODevice::ReadOnly)) return c;
+@@ -73,6 +79,7 @@
+            "\n----- generated content -----\n"+body;
+ }
+ 
++// Keep a project-local provenance snapshot so normal operation has no registry dependency.
+ bool ContextProvenance::ensurePortableSnapshot(const QString &root, QString *err) {
+     QJsonObject o;
+     o["schema"]=1; o["project_id"]=ProjectId; o["project_name"]=ProjectName;

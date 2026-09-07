@@ -1,0 +1,96 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: deep_diagnostics.cpp
+# generated: 2026-09-07T15:41:00-07:00
+
+--- before/deep_diagnostics.cpp
++++ after/deep_diagnostics.cpp
+@@ -1,4 +1,8 @@
+ // #ju56Us
++// READ ME: deeper post-crash evidence collectors.
++// Each section should say what was observed and its limitations. In particular,
++// ACCESS LIMITED / UNAVAILABLE means "not checked", never "healthy".
++
+ #include "deep_diagnostics.h"
+ #include "state_paths.h"
+ 
+@@ -11,6 +15,7 @@
+ #include <QStringList>
+ #include <QTextStream>
+ 
++// Explain why a command/file may be unavailable in this package environment.
+ static QString accessContext()
+ {
+     return QStringLiteral(
+@@ -21,6 +26,7 @@
+         .arg(StatePaths::packagingMode());
+ }
+ 
++// Execute a diagnostic helper and preserve unavailable/denied/incomplete distinctions.
+ static QString runCommand(const QString &program,
+                           const QStringList &args,
+                           int timeoutMs = 10000)
+@@ -105,6 +111,7 @@
+     return lines.join(QStringLiteral("\n"));
+ }
+ 
++// Storage inventory plus SMART/NVMe evidence when permissions and tools allow it.
+ static QString storageHealthReport()
+ {
+     QString report;
+@@ -168,6 +175,7 @@
+     return report;
+ }
+ 
++// Search specifically for MCE/machine-check/EDAC evidence; absence is not proof of health.
+ static QString memoryHardwareEvidence()
+ {
+     QString report;
+@@ -224,6 +232,7 @@
+     return report;
+ }
+ 
++// Read platform/DMI/kernel inventory useful when comparing firmware-related crashes.
+ static QString firmwareInventory()
+ {
+     struct Entry {
+@@ -268,6 +277,7 @@
+     return report;
+ }
+ 
++// Summarize userspace coredumps; these cannot explain every whole-system reset.
+ static QString coredumpSummary()
+ {
+     QString report;
+@@ -298,6 +308,7 @@
+     return report;
+ }
+ 
++// Capture the end of the previous journal to look for the last persisted events.
+ static QString previousBootFinalTail()
+ {
+     QString report;
+@@ -320,6 +331,7 @@
+     return report;
+ }
+ 
++// Look for orderly shutdown markers; missing markers support investigation, not proof.
+ static QString cleanShutdownEvidence(const QString &tail)
+ {
+     const QStringList markers = {
+@@ -365,6 +377,7 @@
+     return report;
+ }
+ 
++// Distinguish absent, permission-limited, readable-empty, and actual pstore records.
+ static QString pstoreEvidence()
+ {
+     const QString path = QStringLiteral("/sys/fs/pstore");
+@@ -440,6 +453,7 @@
+     return report;
+ }
+ 
++// Generate individual reports first, then combine them into one comprehensive report.
+ bool DeepDiagnostics::writeReports(const QString &stateDir,
+                                    QString *error)
+ {

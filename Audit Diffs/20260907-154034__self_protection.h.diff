@@ -1,0 +1,17 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: self_protection.h
+# generated: 2026-09-07T15:40:34-07:00
+
+--- before/self_protection.h
++++ after/self_protection.h
+@@ -1,4 +1,9 @@
+ #pragma once
++// READ ME: CrashSentinel's protection against CrashSentinel itself.
++// It tracks same-boot process failures separately from whole-computer abnormal
++// reboots. The reboot counter supports the 5-reboot precaution and 20-reboot
++// hard stop.
++
+ // #ju56Us
+ 
+ #include <QString>

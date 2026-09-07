@@ -1,0 +1,39 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: resource_guard.h
+# generated: 2026-09-07T11:15:22-07:00
+
+--- /dev/null
++++ after/resource_guard.h
+@@ -0,0 +1,31 @@
++#pragma once
++// #ju56Us
++
++#include "crash_settings.h"
++#include <QString>
++#include <QStringList>
++
++struct ResourceGuardState
++{
++    bool criticalStop = false;
++    bool degraded = false;
++    bool purgeRequested = false;
++    int recommendedIntervalSeconds = 20;
++    QStringList reasons;
++};
++
++class ResourceGuard
++{
++public:
++    static ResourceGuardState evaluate(const CrashSettings &settings, const QString &stateDir);
++    static QString hardcodedPolicyText();
++
++private:
++    static qint64 availableMemoryMiB();
++    static qint64 freeDiskMiB(const QString &path);
++    static int diskUsedPercent(const QString &path);
++    static int batteryPercent();
++    static bool batteryDischarging();
++    static double maxTemperatureC();
++    static double pressureSomeAvg10(const QString &path);
++};

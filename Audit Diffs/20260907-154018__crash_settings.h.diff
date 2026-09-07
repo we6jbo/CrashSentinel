@@ -1,0 +1,16 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: crash_settings.h
+# generated: 2026-09-07T15:40:18-07:00
+
+--- before/crash_settings.h
++++ after/crash_settings.h
+@@ -1,4 +1,8 @@
+ #pragma once
++// READ ME: user-adjustable preferences live here.
++// These values can request MORE conservative behavior, but ResourceGuard has
++// hardcoded safety floors/ceilings that user settings cannot weaken.
++
+ // #ju56Us
+ 
+ #include <QString>

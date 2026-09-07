@@ -1,0 +1,84 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: deep_diagnostics.cpp
+# generated: 2026-09-07T15:29:47-07:00
+
+--- before/deep_diagnostics.cpp
++++ after/deep_diagnostics.cpp
+@@ -368,7 +368,7 @@
+ static QString pstoreEvidence()
+ {
+     const QString path = QStringLiteral("/sys/fs/pstore");
+-    QDir dir(path);
++    QFileInfo pathInfo(path);
+ 
+     QString report;
+     QTextStream out(&report);
+@@ -376,23 +376,58 @@
+     out << "#ju56Us\n";
+     out << "CrashSentinel pstore / ramoops evidence\n\n";
+ 
+-    if (!dir.exists()) {
+-        out << "/sys/fs/pstore is not present on this system.\n";
++    if (!pathInfo.exists()) {
++        out << "[UNAVAILABLE] /sys/fs/pstore is not present on this system.\n";
++        out << "No conclusion about crash health can be drawn from an unavailable "
++               "pstore interface.\n";
++        return report;
++    }
++
++    if (!pathInfo.isDir()) {
++        out << "[UNAVAILABLE] /sys/fs/pstore exists but is not accessible as a "
++               "directory.\n";
++        out << "This is not evidence that no crash record exists.\n";
++        return report;
++    }
++
++    QDir dir(path);
++
++    const QStringList allFiles =
++        dir.entryList(QDir::Files | QDir::NoDotAndDotDot, QDir::Name);
++
++    const QFileInfoList readableFiles =
++        dir.entryInfoList(QDir::Files | QDir::Readable, QDir::Name);
++
++    if (!pathInfo.isReadable()) {
++        out << "[ACCESS LIMITED] /sys/fs/pstore exists, but CrashSentinel "
++               "does not have permission to read it.\n";
++        out << "A kernel crash record could be present but hidden from this "
++               "process. This is not evidence that pstore is empty or that "
++               "the system is healthy.\n";
++        out << StatePaths::stateExplanation() << '\n';
+         return report;
+     }
+ 
+-    const QFileInfoList files =
+-        dir.entryInfoList(QDir::Files, QDir::Name);
++    if (allFiles.isEmpty()) {
++        out << "The pstore directory is readable and currently contains no "
++               "crash-record files.\n";
++        out << "An empty pstore does not prove that no hardware, firmware, "
++               "power, or kernel failure occurred.\n";
++        return report;
++    }
+ 
+-    if (files.isEmpty()) {
+-        out << "The pstore directory exists but contains no readable "
+-               "crash records.\n";
++    if (readableFiles.isEmpty()) {
++        out << "[ACCESS LIMITED] pstore contains one or more crash-record "
++               "files, but none are readable by CrashSentinel.\n";
++        out << "A crash record may exist but be unavailable because of Linux "
++               "permissions or package confinement. This is not a healthy "
++               "result.\n";
++        out << StatePaths::stateExplanation() << '\n';
+         return report;
+     }
+ 
+     int count = 0;
+-
+-    for (const QFileInfo &fi : files) {
++    for (const QFileInfo &fi : readableFiles) {
+         if (++count > 16) {
+             out << "\n[additional pstore files omitted]\n";
+             break;

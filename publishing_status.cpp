@@ -1,0 +1,206 @@
+// #ju56Us
+// READ ME: performs LOCAL publication-preparation checks only.
+// Never convert a local file check into a claim that an external service has
+// published or reviewed the project.
+
+#include "publishing_status.h"
+
+#include <QDir>
+#include <QFile>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QProcess>
+#include <QSaveFile>
+#include <QStandardPaths>
+
+static QString runCommand(const QString &program, const QStringList &args)
+{
+    QProcess p;
+    p.start(program, args);
+
+    if (!p.waitForStarted(1200))
+        return {};
+
+    if (!p.waitForFinished(4000)) {
+        p.kill();
+        p.waitForFinished(500);
+        return {};
+    }
+
+    return QString::fromUtf8(p.readAllStandardOutput()).trimmed();
+}
+
+QString PublishingStatusBuilder::stateFile()
+{
+    QString base =
+        QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+
+    if (base.isEmpty())
+        base = QDir::homePath() +
+               QStringLiteral("/.config/j03.page/CrashSentinel");
+
+    QDir().mkpath(base);
+
+    return QDir(base).filePath(
+        QStringLiteral("publishing-ui.json"));
+}
+
+bool PublishingStatusBuilder::isHiddenByUser()
+{
+    QFile f(stateFile());
+
+    if (!f.open(QIODevice::ReadOnly))
+        return false;
+
+    const QJsonDocument doc =
+        QJsonDocument::fromJson(f.readAll());
+
+    return doc.isObject() &&
+           doc.object()
+               .value(QStringLiteral("hide_install_publish_tab"))
+               .toBool(false);
+}
+
+bool PublishingStatusBuilder::setHiddenByUser(bool hidden,
+                                              QString *error)
+{
+    QJsonObject o;
+    o.insert(QStringLiteral("_audit_tag"),
+             QStringLiteral("#ju56Us"));
+    o.insert(QStringLiteral("schema"), 1);
+    o.insert(QStringLiteral("hide_install_publish_tab"),
+             hidden);
+
+    QSaveFile f(stateFile());
+
+    if (!f.open(QIODevice::WriteOnly)) {
+        if (error)
+            *error = f.errorString();
+        return false;
+    }
+
+    f.write(QJsonDocument(o).toJson(QJsonDocument::Indented));
+
+    if (!f.commit()) {
+        if (error)
+            *error = QStringLiteral(
+                "Could not save publishing UI state.");
+        return false;
+    }
+
+    return true;
+}
+
+// Detect only facts visible in the local project tree and Git configuration.
+PublishingStatus PublishingStatusBuilder::detect(
+    const QString &projectRoot)
+{
+    PublishingStatus s;
+    QStringList out;
+
+    if (projectRoot.isEmpty()) {
+        s.details =
+            QStringLiteral(
+                "Project source root was not detected. "
+                "Local publishing checks cannot run.");
+        return s;
+    }
+
+    const QDir root(projectRoot);
+
+    const bool gitRepo =
+        QDir(root.filePath(QStringLiteral(".git"))).exists();
+
+    const QString remote =
+        runCommand(QStringLiteral("git"),
+                   {QStringLiteral("-C"),
+                    projectRoot,
+                    QStringLiteral("remote"),
+                    QStringLiteral("get-url"),
+                    QStringLiteral("origin")});
+
+    const bool readme =
+        QFile::exists(root.filePath(QStringLiteral("README.md")));
+
+    const bool license =
+        QFile::exists(root.filePath(QStringLiteral("LICENSE"))) ||
+        QFile::exists(root.filePath(QStringLiteral("LICENSE.txt")));
+
+    s.githubReady =
+        gitRepo && !remote.isEmpty() && readme && license;
+
+    const bool snapcraft =
+        QFile::exists(root.filePath(QStringLiteral("snapcraft.yaml"))) ||
+        QFile::exists(root.filePath(QStringLiteral("snap/snapcraft.yaml")));
+
+    s.snapReady = snapcraft;
+
+    const bool flatpakManifest =
+        QFile::exists(
+            root.filePath(
+                QStringLiteral("page.j03.CrashSentinel.json"))) ||
+        QFile::exists(
+            root.filePath(
+                QStringLiteral("page.j03.CrashSentinel.yml"))) ||
+        QFile::exists(
+            root.filePath(
+                QStringLiteral("page.j03.CrashSentinel.yaml")));
+
+    const bool metainfo =
+        QFile::exists(
+            root.filePath(
+                QStringLiteral(
+                    "page.j03.CrashSentinel.metainfo.xml"))) ||
+        QFile::exists(
+            root.filePath(
+                QStringLiteral(
+                    "data/page.j03.CrashSentinel.metainfo.xml")));
+
+    s.flatpakReady = flatpakManifest && metainfo;
+
+    s.allLocalChecksPass =
+        s.githubReady && s.snapReady && s.flatpakReady;
+
+    out << QStringLiteral("Project root: %1").arg(projectRoot);
+    out << QString();
+    out << QStringLiteral("GitHub local preparation:");
+    out << QStringLiteral("  Git repository: %1")
+               .arg(gitRepo ? "YES" : "NO");
+    out << QStringLiteral("  Origin remote: %1")
+               .arg(remote.isEmpty()
+                        ? "NOT CONFIGURED"
+                        : remote);
+    out << QStringLiteral("  README.md: %1")
+               .arg(readme ? "YES" : "NO");
+    out << QStringLiteral("  License: %1")
+               .arg(license ? "YES" : "NO");
+    out << QStringLiteral("  Local readiness: %1")
+               .arg(s.githubReady ? "PASS" : "INCOMPLETE");
+
+    out << QString();
+    out << QStringLiteral("Snap local preparation:");
+    out << QStringLiteral("  snapcraft.yaml: %1")
+               .arg(snapcraft ? "YES" : "NO");
+    out << QStringLiteral("  Local readiness: %1")
+               .arg(s.snapReady ? "PASS" : "INCOMPLETE");
+
+    out << QString();
+    out << QStringLiteral("Flatpak / Flathub local preparation:");
+    out << QStringLiteral("  Manifest: %1")
+               .arg(flatpakManifest ? "YES" : "NO");
+    out << QStringLiteral("  AppStream metainfo: %1")
+               .arg(metainfo ? "YES" : "NO");
+    out << QStringLiteral("  Local readiness: %1")
+               .arg(s.flatpakReady ? "PASS" : "INCOMPLETE");
+
+    out << QString();
+    out << QStringLiteral(
+        "External publication is not inferred from local files.");
+    out << QStringLiteral(
+        "GitHub must actually be pushed. Snap Store registration, "
+        "upload/review, and initial Flathub submission/review must "
+        "be verified separately.");
+
+    s.details = out.join(QStringLiteral("\n"));
+    return s;
+}

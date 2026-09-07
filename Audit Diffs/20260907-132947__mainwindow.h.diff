@@ -1,0 +1,55 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: mainwindow.h
+# generated: 2026-09-07T13:29:47-07:00
+
+--- before/mainwindow.h
++++ after/mainwindow.h
+@@ -7,6 +7,8 @@
+ class QSpinBox;
+ class QCheckBox;
+ class QPlainTextEdit;
++class QPushButton;
++class UpdateChecker;
+ 
+ class MainWindow : public QMainWindow
+ {
+@@ -19,6 +21,9 @@
+     void refreshStatus();
+     void applyGamingDefaults();
+     void applyBalancedDefaults();
++    void checkForUpdates();
++    void openUpdateInstructions();
++    void clearQuarantine();
+ 
+ private:
+     QWidget *makeScrollable(QWidget *content);
+@@ -27,11 +32,20 @@
+     QWidget *buildProfilesTab();
+     QWidget *buildReportsTab();
+     void loadSettingsIntoUi();
++    QString statusText() const;
+ 
++    QLabel *versionLabel_ = nullptr;
+     QLabel *statusLabel_ = nullptr;
+     QLabel *configPathLabel_ = nullptr;
++    QLabel *updateLabel_ = nullptr;
++
++    QPlainTextEdit *statusDetails_ = nullptr;
+     QPlainTextEdit *reportView_ = nullptr;
+ 
++    QPushButton *checkUpdatesButton_ = nullptr;
++    QPushButton *openUpdateButton_ = nullptr;
++    QPushButton *clearQuarantineButton_ = nullptr;
++
+     QSpinBox *diskGiB_ = nullptr;
+     QSpinBox *diskUsedPct_ = nullptr;
+     QSpinBox *memoryMiB_ = nullptr;
+@@ -46,4 +60,7 @@
+     QCheckBox *gamingProfile_ = nullptr;
+     QCheckBox *pauseHeavy_ = nullptr;
+     QCheckBox *autoPurge_ = nullptr;
++
++    UpdateChecker *updateChecker_ = nullptr;
++    QString updateInstructionsUrl_;
+ };

@@ -1,0 +1,30 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: publishing_status.h
+# generated: 2026-09-07T14:34:50-07:00
+
+--- /dev/null
++++ after/publishing_status.h
+@@ -0,0 +1,22 @@
++#pragma once
++// #ju56Us
++
++#include <QString>
++
++struct PublishingStatus
++{
++    bool githubReady = false;
++    bool snapReady = false;
++    bool flatpakReady = false;
++    bool allLocalChecksPass = false;
++    QString details;
++};
++
++class PublishingStatusBuilder
++{
++public:
++    static PublishingStatus detect(const QString &projectRoot);
++    static QString stateFile();
++    static bool isHiddenByUser();
++    static bool setHiddenByUser(bool hidden, QString *error = nullptr);
++};

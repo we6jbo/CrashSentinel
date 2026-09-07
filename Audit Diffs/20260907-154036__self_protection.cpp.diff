@@ -1,0 +1,69 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: self_protection.cpp
+# generated: 2026-09-07T15:40:36-07:00
+
+--- before/self_protection.cpp
++++ after/self_protection.cpp
+@@ -1,4 +1,13 @@
+ // #ju56Us
++// READ ME: self-protection state machine.
++// A changed boot ID while the prior service state was still "active" counts as
++// an abnormal reboot observed while monitoring was active. That is correlation,
++// NOT proof CrashSentinel caused the reboot.
++//
++// 5 reboots: precautionary quarantine unless deliberately acknowledged.
++// 20 reboots: hard stop; ordinary quarantine clearing is refused.
++// The full reset is intentionally separate because it erases the reboot count.
++
+ #include "self_protection.h"
+ 
+ #include <QDir>
+@@ -26,6 +35,7 @@
+     return f.commit();
+ }
+ 
++// Write a human-readable explanation beside the machine-readable JSON state.
+ static bool writeDisabledNotice(const QString &stateDir,
+                                 int abnormalReboots,
+                                 bool hardStop)
+@@ -101,6 +111,7 @@
+     return state;
+ }
+ 
++// Core safety decision: classify the previous run before allowing this service start.
+ SelfProtectionState SelfProtection::noteServiceStart(const QString &stateDir)
+ {
+     QDir().mkpath(stateDir);
+@@ -180,6 +191,7 @@
+     return state;
+ }
+ 
++// Mark the current service as alive using monotonic uptime, not visible wall-clock time.
+ void SelfProtection::noteHeartbeat(const QString &stateDir)
+ {
+     const QString path = statePath(stateDir);
+@@ -192,6 +204,7 @@
+     writeObject(path, o);
+ }
+ 
++// A clean exit prevents the next boot/start from being misclassified as abnormal.
+ void SelfProtection::noteCleanExit(const QString &stateDir)
+ {
+     const QString path = statePath(stateDir);
+@@ -204,6 +217,7 @@
+     writeObject(path, o);
+ }
+ 
++// Normal acknowledgement: preserves abnormal reboot count and cannot bypass hard stop.
+ bool SelfProtection::clearQuarantine(const QString &stateDir, QString *error)
+ {
+     const QString path = statePath(stateDir);
+@@ -237,6 +251,7 @@
+ }
+ 
+ 
++// Explicit full reset: intentionally clears the accumulated reboot count.
+ bool SelfProtection::resetRebootSafeguard(const QString &stateDir, QString *error)
+ {
+     const QString path = statePath(stateDir);

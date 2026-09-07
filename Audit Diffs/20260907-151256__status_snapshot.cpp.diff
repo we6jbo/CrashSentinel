@@ -1,0 +1,26 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: status_snapshot.cpp
+# generated: 2026-09-07T15:12:56-07:00
+
+--- before/status_snapshot.cpp
++++ after/status_snapshot.cpp
+@@ -2,6 +2,7 @@
+ #include "status_snapshot.h"
+ #include "self_protection.h"
+ #include "version_info.h"
++#include "state_paths.h"
+ 
+ #include <QDir>
+ #include <QFile>
+@@ -13,9 +14,7 @@
+ 
+ QString StatusSnapshotBuilder::defaultStateDir()
+ {
+-    QString d = QStandardPaths::writableLocation(QStandardPaths::StateLocation);
+-    if (d.isEmpty()) d = QDir::homePath() + "/.local/state/CrashSentinel";
+-    return d;
++    return StatePaths::sharedStateDir();
+ }
+ 
+ static QString firstSummaryLines(const QString &path)

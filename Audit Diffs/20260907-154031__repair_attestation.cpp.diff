@@ -1,0 +1,24 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: repair_attestation.cpp
+# generated: 2026-09-07T15:40:31-07:00
+
+--- before/repair_attestation.cpp
++++ after/repair_attestation.cpp
+@@ -1,4 +1,8 @@
+ // #ju56Us
++// READ ME: implementation of the machine-local repair/evidence attestation.
++// The secret stays local; derived tokens are evidence-of-recent-operation, not
++// proof that a crash has been diagnosed or repaired.
++
+ #include "repair_attestation.h"
+ #include "context_provenance.h"
+ 
+@@ -95,6 +99,7 @@
+     return QString::fromUtf8(f.readAll()).trimmed();
+ }
+ 
++// Refresh the bounded recent-operation attestation; this is not a health certificate.
+ bool RepairAttestation::update(const QString &stateDir,
+                                const QString &snapshotSha256,
+                                QString *errorMessage)

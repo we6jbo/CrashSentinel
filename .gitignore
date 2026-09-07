@@ -1,3 +1,4 @@
+# #ju56Us
 build/
 build-*/
 cmake-build-*/
@@ -5,3 +6,4 @@ CMakeFiles/
 CMakeCache.txt
 *.o
 *.user
+.audit-state/

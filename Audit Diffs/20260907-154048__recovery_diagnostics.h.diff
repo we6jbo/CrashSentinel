@@ -1,0 +1,16 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: recovery_diagnostics.h
+# generated: 2026-09-07T15:40:48-07:00
+
+--- before/recovery_diagnostics.h
++++ after/recovery_diagnostics.h
+@@ -1,4 +1,8 @@
+ #pragma once
++// READ ME: lightweight recovery operations that remain useful even when the
++// monitor is quarantined. Recovery is intentionally limited to CrashSentinel
++// state; it does not claim to repair Linux, firmware, or hardware.
++
+ // #ju56Us
+ 
+ #include <QString>

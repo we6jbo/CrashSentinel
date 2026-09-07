@@ -1,0 +1,23 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: update_checker.cpp
+# generated: 2026-09-07T15:40:46-07:00
+
+--- before/update_checker.cpp
++++ after/update_checker.cpp
+@@ -1,4 +1,7 @@
+ // #ju56Us
++// READ ME: fetches the update page and compares semantic version components.
++// This code only reports availability/instructions. It does not self-update.
++
+ #include "update_checker.h"
+ #include "version_info.h"
+ 
+@@ -42,6 +45,7 @@
+ {
+ }
+ 
++// Network check only: report advertised version/instructions; never install an update here.
+ void UpdateChecker::check()
+ {
+     QNetworkRequest request(

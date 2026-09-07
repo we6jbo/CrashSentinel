@@ -1,0 +1,52 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: main.cpp
+# generated: 2026-09-07T10:14:49-07:00
+
+--- before/main.cpp
++++ after/main.cpp
+@@ -1,10 +1,44 @@
++// #ju56Us
+ #include <QApplication>
++#include <QCoreApplication>
++#include <QDebug>
++
+ #include "mainwindow.h"
++#include "context_provenance.h"
+ 
+ int main(int argc, char *argv[])
+ {
+     QApplication app(argc, argv);
+ 
++    const QString projectRoot = QCoreApplication::applicationDirPath();
++
++    QString snapshotError;
++    ContextProvenance::ensurePortableSnapshot(projectRoot, &snapshotError);
++
++    QString registrationDiagnostic;
++    ContextProvenance::attemptRegistrationOnce(
++        projectRoot,
++        &registrationDiagnostic
++    );
++
++    const MachineContext context =
++        ContextProvenance::loadMachineContext();
++
++    qInfo().noquote()
++        << ContextProvenance::provenanceSummary();
++
++    qInfo().noquote()
++        << ContextProvenance::userVisibleContextSummary(context);
++
++    if (!snapshotError.isEmpty()) {
++        qWarning().noquote()
++            << "Portable snapshot warning:"
++            << snapshotError;
++    }
++
++    qInfo().noquote()
++        << registrationDiagnostic;
++
+     MainWindow window;
+     window.show();
+ 

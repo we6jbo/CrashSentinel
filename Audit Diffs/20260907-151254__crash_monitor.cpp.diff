@@ -1,0 +1,31 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: crash_monitor.cpp
+# generated: 2026-09-07T15:12:54-07:00
+
+--- before/crash_monitor.cpp
++++ after/crash_monitor.cpp
+@@ -5,6 +5,7 @@
+ #include "resource_guard.h"
+ #include "self_protection.h"
+ #include "deep_diagnostics.h"
++#include "state_paths.h"
+ #include "version_info.h"
+ 
+ #include <QCryptographicHash>
+@@ -88,14 +89,7 @@
+ 
+ QString CrashMonitor::stateDir() const
+ {
+-    const QString overrideDir = qEnvironmentVariable("CRASHSENTINEL_STATE_DIR");
+-    if (!overrideDir.trimmed().isEmpty())
+-        return overrideDir;
+-
+-    QString base = QStandardPaths::writableLocation(QStandardPaths::StateLocation);
+-    if (base.isEmpty())
+-        base = QDir::homePath() + QStringLiteral("/.local/state/CrashSentinel");
+-    return base;
++    return StatePaths::sharedStateDir();
+ }
+ 
+ QString CrashMonitor::publicStateDir() const

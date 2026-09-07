@@ -1,0 +1,201 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: mainwindow.cpp
+# generated: 2026-09-07T14:24:03-07:00
+
+--- before/mainwindow.cpp
++++ after/mainwindow.cpp
+@@ -4,6 +4,7 @@
+ #include "crash_settings.h"
+ #include "resource_guard.h"
+ #include "self_protection.h"
++#include "recovery_diagnostics.h"
+ #include "status_snapshot.h"
+ #include "update_checker.h"
+ #include "version_info.h"
+@@ -17,6 +18,7 @@
+ #include <QLabel>
+ #include <QPlainTextEdit>
+ #include <QPushButton>
++#include <QTimer>
+ #include <QScrollArea>
+ #include <QSpinBox>
+ #include <QStandardPaths>
+@@ -57,6 +59,8 @@
+                  QStringLiteral("Profiles"));
+     tabs->addTab(makeScrollable(buildReportsTab()),
+                  QStringLiteral("Reports"));
++    tabs->addTab(makeScrollable(buildRecoveryDiagnosticsTab()),
++                 QStringLiteral("Recovery & Diagnostics"));
+ 
+     setCentralWidget(tabs);
+ 
+@@ -265,6 +269,70 @@
+     return w;
+ }
+ 
++QWidget *MainWindow::buildRecoveryDiagnosticsTab()
++{
++    auto *w = new QWidget;
++    auto *v = new QVBoxLayout(w);
++
++    auto *title =
++        new QLabel(QStringLiteral("<h2>Recovery &amp; Diagnostics</h2>"));
++    title->setWordWrap(true);
++
++    auto *intro =
++        new QLabel(QStringLiteral(
++            "This tab helps recover from unusual CrashSentinel conditions "
++            "without requiring terminal or state-file surgery. Recovery "
++            "functions remain lightweight even when heavy monitoring is "
++            "self-quarantined."));
++    intro->setWordWrap(true);
++
++    recoverySummary_ = new QLabel;
++    recoverySummary_->setWordWrap(true);
++
++    recoveryDetails_ = new QPlainTextEdit;
++    recoveryDetails_->setReadOnly(true);
++    recoveryDetails_->setMinimumHeight(360);
++
++    auto *refresh =
++        new QPushButton(QStringLiteral("Show What Is Going On"));
++    auto *backup =
++        new QPushButton(QStringLiteral("Create Backup Before Repair"));
++
++    clearRecoveryQuarantineButton_ =
++        new QPushButton(QStringLiteral("Clear Self-Quarantine"));
++
++    rebuildRecoveryReportsButton_ =
++        new QPushButton(QStringLiteral("Rebuild Derived Reports"));
++
++    auto *exportButton =
++        new QPushButton(QStringLiteral("Export Diagnostic Report"));
++
++    connect(refresh, &QPushButton::clicked,
++            this, &MainWindow::refreshRecoveryDiagnostics);
++    connect(backup, &QPushButton::clicked,
++            this, &MainWindow::backupBeforeRecovery);
++    connect(clearRecoveryQuarantineButton_, &QPushButton::clicked,
++            this, &MainWindow::clearRecoveryQuarantine);
++    connect(rebuildRecoveryReportsButton_, &QPushButton::clicked,
++            this, &MainWindow::rebuildRecoveryReports);
++    connect(exportButton, &QPushButton::clicked,
++            this, &MainWindow::exportRecoveryDiagnostics);
++
++    v->addWidget(title);
++    v->addWidget(intro);
++    v->addWidget(recoverySummary_);
++    v->addWidget(recoveryDetails_);
++    v->addWidget(refresh);
++    v->addWidget(backup);
++    v->addWidget(clearRecoveryQuarantineButton_);
++    v->addWidget(rebuildRecoveryReportsButton_);
++    v->addWidget(exportButton);
++    v->addStretch();
++
++    QTimer::singleShot(0, this, &MainWindow::refreshRecoveryDiagnostics);
++    return w;
++}
++
+ QWidget *MainWindow::buildReportsTab()
+ {
+     auto *w = new QWidget;
+@@ -520,3 +588,97 @@
+ 
+     refreshStatus();
+ }
++
++
++void MainWindow::refreshRecoveryDiagnostics()
++{
++    const QString stateDir =
++        QStandardPaths::writableLocation(QStandardPaths::StateLocation);
++
++    const RecoveryDiagnosticsStatus status =
++        RecoveryDiagnostics::inspect(stateDir);
++
++    recoverySummary_->setText(
++        QStringLiteral("<b>%1</b>")
++            .arg(status.summary.toHtmlEscaped()));
++
++    recoveryDetails_->setPlainText(status.details);
++    clearRecoveryQuarantineButton_->setEnabled(status.quarantined);
++    rebuildRecoveryReportsButton_->setEnabled(
++        status.previousBootReportExists || status.analysisMarkerExists);
++}
++
++void MainWindow::backupBeforeRecovery()
++{
++    const QString stateDir =
++        QStandardPaths::writableLocation(QStandardPaths::StateLocation);
++    QString error;
++    const QString path =
++        RecoveryDiagnostics::createBackup(stateDir, &error);
++
++    if (path.isEmpty()) {
++        recoverySummary_->setText(
++            QStringLiteral("<b>Backup failed:</b> %1")
++                .arg(error.toHtmlEscaped()));
++        return;
++    }
++
++    recoverySummary_->setText(
++        QStringLiteral("<b>Recovery backup created:</b> %1")
++            .arg(path.toHtmlEscaped()));
++}
++
++void MainWindow::clearRecoveryQuarantine()
++{
++    const QString stateDir =
++        QStandardPaths::writableLocation(QStandardPaths::StateLocation);
++    QString error;
++
++    if (!RecoveryDiagnostics::clearSelfQuarantine(stateDir, &error)) {
++        recoverySummary_->setText(
++            QStringLiteral("<b>Could not clear quarantine:</b> %1")
++                .arg(error.toHtmlEscaped()));
++        return;
++    }
++
++    refreshRecoveryDiagnostics();
++}
++
++void MainWindow::rebuildRecoveryReports()
++{
++    const QString stateDir =
++        QStandardPaths::writableLocation(QStandardPaths::StateLocation);
++    QString error;
++
++    if (!RecoveryDiagnostics::rebuildDerivedReportMarker(stateDir, &error)) {
++        recoverySummary_->setText(
++            QStringLiteral("<b>Could not prepare report rebuild:</b> %1")
++                .arg(error.toHtmlEscaped()));
++        return;
++    }
++
++    recoverySummary_->setText(
++        QStringLiteral("<b>Derived-report marker cleared.</b> "
++                       "Restart the monitor service when you want the "
++                       "previous-boot analysis regenerated."));
++}
++
++void MainWindow::exportRecoveryDiagnostics()
++{
++    const QString stateDir =
++        QStandardPaths::writableLocation(QStandardPaths::StateLocation);
++    QString error;
++    const QString path =
++        RecoveryDiagnostics::exportDiagnosticReport(stateDir, &error);
++
++    if (path.isEmpty()) {
++        recoverySummary_->setText(
++            QStringLiteral("<b>Diagnostic export failed:</b> %1")
++                .arg(error.toHtmlEscaped()));
++        return;
++    }
++
++    recoverySummary_->setText(
++        QStringLiteral("<b>Diagnostic report exported:</b> %1")
++            .arg(path.toHtmlEscaped()));
++}

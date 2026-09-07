@@ -1,0 +1,28 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: mainwindow.h
+# generated: 2026-09-07T14:24:06-07:00
+
+--- before/mainwindow.h
++++ after/mainwindow.h
+@@ -31,9 +31,20 @@
+     QWidget *buildSafeguardsTab();
+     QWidget *buildProfilesTab();
+     QWidget *buildReportsTab();
++    QWidget *buildRecoveryDiagnosticsTab();
++    void refreshRecoveryDiagnostics();
++    void backupBeforeRecovery();
++    void clearRecoveryQuarantine();
++    void rebuildRecoveryReports();
++    void exportRecoveryDiagnostics();
+     void loadSettingsIntoUi();
+     QString statusText() const;
+ 
++    QLabel *recoverySummary_ = nullptr;
++    QPlainTextEdit *recoveryDetails_ = nullptr;
++    QPushButton *clearRecoveryQuarantineButton_ = nullptr;
++    QPushButton *rebuildRecoveryReportsButton_ = nullptr;
++
+     QLabel *versionLabel_ = nullptr;
+     QLabel *statusLabel_ = nullptr;
+     QLabel *configPathLabel_ = nullptr;

@@ -1,0 +1,93 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: status_snapshot.cpp
+# generated: 2026-09-07T11:32:34-07:00
+
+--- /dev/null
++++ after/status_snapshot.cpp
+@@ -0,0 +1,85 @@
++// #ju56Us
++#include "status_snapshot.h"
++#include "self_protection.h"
++#include "version_info.h"
++
++#include <QDir>
++#include <QFile>
++#include <QFileInfo>
++#include <QJsonDocument>
++#include <QJsonObject>
++#include <QStandardPaths>
++#include <QTextStream>
++
++QString StatusSnapshotBuilder::defaultStateDir()
++{
++    QString d = QStandardPaths::writableLocation(QStandardPaths::StateLocation);
++    if (d.isEmpty()) d = QDir::homePath() + "/.local/state/CrashSentinel";
++    return d;
++}
++
++static QString firstSummaryLines(const QString &path)
++{
++    QFile f(path);
++    if (!f.open(QIODevice::ReadOnly))
++        return "No previous-boot report is available.";
++    QStringList lines;
++    while (!f.atEnd() && lines.size() < 8) {
++        const QString l = QString::fromUtf8(f.readLine()).trimmed();
++        if (l.startsWith("[CONFIRMED]") || l.startsWith("[SUSPICIOUS]") ||
++            l.contains("unclean", Qt::CaseInsensitive))
++            lines << l;
++    }
++    return lines.isEmpty() ? "Report exists; no short evidence summary extracted."
++                           : lines.join("\n");
++}
++
++StatusSnapshot StatusSnapshotBuilder::build()
++{
++    StatusSnapshot s;
++    s.version = CrashSentinelVersion::Version;
++    s.channel = CrashSentinelVersion::Channel;
++    s.stateDir = defaultStateDir();
++
++    if (!qEnvironmentVariable("SNAP").isEmpty())
++        s.packageType = "Snap";
++    else if (!qEnvironmentVariable("FLATPAK_ID").isEmpty())
++        s.packageType = "Flatpak";
++    else
++        s.packageType = "Development/native";
++
++    s.guiUser = qEnvironmentVariable("USER", "unknown");
++
++    // service-health.json is intended to be written by the daemon. If absent,
++    // do not guess which user the daemon uses.
++    QFile health(QDir(s.stateDir).filePath("service-health.json"));
++    if (health.open(QIODevice::ReadOnly)) {
++        const auto doc = QJsonDocument::fromJson(health.readAll());
++        const auto o = doc.object();
++        s.daemonEvidenceUser = o.value("effective_user").toString("unknown");
++        s.impactSummary =
++            QString("Last collection: %1 ms; daemon RSS: %2 MiB; snapshot: %3 KiB")
++                .arg(o.value("collection_duration_ms").toInt(-1))
++                .arg(o.value("rss_mib").toDouble(-1), 0, 'f', 1)
++                .arg(o.value("snapshot_kib").toDouble(-1), 0, 'f', 1);
++    } else {
++        s.daemonEvidenceUser = "Not yet reported";
++        s.impactSummary =
++            "No daemon performance sample yet. CrashSentinel does not claim "
++            "zero impact; Status will report measured collection cost.";
++    }
++
++    QFile ready(QDir(s.stateDir).filePath("repair-readiness.json"));
++    s.serviceState = ready.exists()
++        ? "Monitoring evidence exists"
++        : "No repair-readiness evidence detected";
++
++    const auto sp = SelfProtection::readState(s.stateDir);
++    s.selfProtection = sp.quarantined
++        ? "SELF-QUARANTINED: " + sp.reason
++        : QString("Normal; rapid same-boot failures=%1").arg(sp.rapidFailures);
++
++    s.crashSummary = firstSummaryLines(
++        QDir(s.stateDir).filePath("reports/previous-boot-analysis.txt"));
++    return s;
++}

@@ -1,0 +1,16 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: version_info.h
+# generated: 2026-09-07T15:41:07-07:00
+
+--- before/version_info.h
++++ after/version_info.h
+@@ -1,4 +1,8 @@
+ #pragma once
++// READ ME: small, centralized release identity.
++// Change version/channel here when intentionally preparing a release. The update
++// page values are used only for checking/reporting available versions.
++
+ // #ju56Us
+ 
+ namespace CrashSentinelVersion {

@@ -1,0 +1,25 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: repair_attestation.h
+# generated: 2026-09-07T10:57:40-07:00
+
+--- /dev/null
++++ after/repair_attestation.h
+@@ -0,0 +1,17 @@
++#pragma once
++// #ju56Us
++
++#include <QString>
++
++class RepairAttestation
++{
++public:
++    static bool update(const QString &stateDir,
++                       const QString &snapshotSha256,
++                       QString *errorMessage = nullptr);
++
++private:
++    static QByteArray hmacSha256(const QByteArray &key, const QByteArray &message);
++    static QByteArray loadOrCreateSecret(const QString &stateDir, QString *errorMessage);
++    static QString bootId();
++};

@@ -1,0 +1,18 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: CMakeLists.txt
+# generated: 2026-09-07T09:58:11-07:00
+
+--- before/CMakeLists.txt
++++ after/CMakeLists.txt
+@@ -1,3 +1,4 @@
++# #ju56Us
+ cmake_minimum_required(VERSION 3.21)
+ 
+ project(CrashSentinel VERSION 0.1 LANGUAGES CXX)
+@@ -22,3 +23,5 @@
+ install(TARGETS CrashSentinel
+     RUNTIME DESTINATION bin
+ )
++
++include("${CMAKE_CURRENT_SOURCE_DIR}/audit_diffs.cmake")

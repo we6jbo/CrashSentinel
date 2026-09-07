@@ -1,0 +1,32 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: crash_settings.cpp
+# generated: 2026-09-07T15:40:21-07:00
+
+--- before/crash_settings.cpp
++++ after/crash_settings.cpp
+@@ -1,4 +1,8 @@
+ // #ju56Us
++// READ ME: loads and saves the user-configurable CrashSentinel settings.
++// Keep compatibility in mind when adding fields: old settings files may not
++// contain newly introduced keys, so defaults matter.
++
+ #include "crash_settings.h"
+ 
+ #include <QDir>
+@@ -17,6 +21,7 @@
+     return QDir(base).filePath(QStringLiteral("settings.json"));
+ }
+ 
++// Load each key with a safe default so older/missing config remains usable.
+ CrashSettings CrashSettings::load()
+ {
+     CrashSettings s;
+@@ -45,6 +50,7 @@
+     return s;
+ }
+ 
++// Persist only user-adjustable preferences; hard safety limits live in ResourceGuard.
+ bool CrashSettings::save(QString *errorMessage) const
+ {
+     QJsonObject o;

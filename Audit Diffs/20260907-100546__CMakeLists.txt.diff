@@ -1,0 +1,17 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: CMakeLists.txt
+# generated: 2026-09-07T10:05:46-07:00
+
+--- before/CMakeLists.txt
++++ after/CMakeLists.txt
+@@ -16,6 +16,9 @@
+     mainwindow.cpp
+     mainwindow.h
+     mainwindow.ui
++    context_provenance.cpp
++    context_provenance.h
++    tg_context_snapshot.json
+ )
+ 
+ target_link_libraries(CrashSentinel PRIVATE Qt6::Widgets)

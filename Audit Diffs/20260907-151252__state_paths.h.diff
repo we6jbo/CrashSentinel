@@ -1,0 +1,19 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: state_paths.h
+# generated: 2026-09-07T15:12:52-07:00
+
+--- /dev/null
++++ after/state_paths.h
+@@ -0,0 +1,11 @@
++#pragma once
++// #ju56Us
++
++#include <QString>
++
++namespace StatePaths
++{
++QString sharedStateDir();
++QString packagingMode();
++QString stateExplanation();
++}

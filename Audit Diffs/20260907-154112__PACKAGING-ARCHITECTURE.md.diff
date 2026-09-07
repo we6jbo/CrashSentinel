@@ -1,0 +1,17 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: PACKAGING-ARCHITECTURE.md
+# generated: 2026-09-07T15:41:12-07:00
+
+--- before/PACKAGING-ARCHITECTURE.md
++++ after/PACKAGING-ARCHITECTURE.md
+@@ -1,3 +1,9 @@
++<!-- READ ME: package architecture rationale.
++This document explains why Snap can host the system monitor while Flatpak is
++treated primarily as a GUI/report viewer. Keep it synchronized with actual
++package manifests and state-path behavior.
++-->
++
+ # CrashSentinel Packaging Architecture
+ <!-- #ju56Us -->
+ 

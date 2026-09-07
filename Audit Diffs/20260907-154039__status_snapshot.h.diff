@@ -1,0 +1,16 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: status_snapshot.h
+# generated: 2026-09-07T15:40:39-07:00
+
+--- before/status_snapshot.h
++++ after/status_snapshot.h
+@@ -1,4 +1,8 @@
+ #pragma once
++// READ ME: StatusSnapshot is the GUI-friendly summary of service/package/
++// self-protection/crash evidence. It keeps presentation code from needing to
++// understand every low-level state file.
++
+ // #ju56Us
+ #include <QString>
+ 

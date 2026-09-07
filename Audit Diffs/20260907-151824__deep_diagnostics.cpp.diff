@@ -1,0 +1,106 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: deep_diagnostics.cpp
+# generated: 2026-09-07T15:18:24-07:00
+
+--- before/deep_diagnostics.cpp
++++ after/deep_diagnostics.cpp
+@@ -1,5 +1,6 @@
+ // #ju56Us
+ #include "deep_diagnostics.h"
++#include "state_paths.h"
+ 
+ #include <QDir>
+ #include <QFile>
+@@ -10,6 +11,16 @@
+ #include <QStringList>
+ #include <QTextStream>
+ 
++static QString accessContext()
++{
++    return QStringLiteral(
++        "Package mode: %1\n"
++        "Unavailable evidence can be caused by Linux permissions, package "
++        "confinement, a missing tool, or an unsupported kernel interface. "
++        "CrashSentinel does not treat unavailable evidence as a healthy result.\n")
++        .arg(StatePaths::packagingMode());
++}
++
+ static QString runCommand(const QString &program,
+                           const QStringList &args,
+                           int timeoutMs = 10000)
+@@ -17,25 +28,58 @@
+     QProcess p;
+     p.start(program, args);
+ 
+-    if (!p.waitForStarted(1500))
+-        return QStringLiteral("[unavailable]\n");
++    if (!p.waitForStarted(1500)) {
++        return QStringLiteral(
++                   "[UNAVAILABLE] Could not start %1: %2\n%3")
++            .arg(program, p.errorString(), accessContext());
++    }
+ 
+     if (!p.waitForFinished(timeoutMs)) {
+         p.kill();
+         p.waitForFinished(1000);
+-        return QStringLiteral("[timed out]\n");
++        return QStringLiteral(
++                   "[UNAVAILABLE] %1 timed out while collecting evidence.\n%2")
++            .arg(program, accessContext());
++    }
++
++    QString result =
++        QString::fromUtf8(p.readAllStandardOutput()) +
++        QString::fromUtf8(p.readAllStandardError());
++
++    const QString lower = result.toLower();
++    const bool accessDenied =
++        lower.contains(QStringLiteral("permission denied")) ||
++        lower.contains(QStringLiteral("operation not permitted")) ||
++        lower.contains(QStringLiteral("access denied"));
++
++    if (accessDenied) {
++        result += QStringLiteral(
++            "\n[ACCESS LIMITED] The command encountered an access-denied "
++            "condition. This can be normal under Snap/Flatpak confinement "
++            "or when the current service lacks host privileges. This is "
++            "not evidence that the checked component is healthy.\n");
++        result += accessContext();
++    } else if (p.exitStatus() != QProcess::NormalExit ||
++               p.exitCode() != 0) {
++        result += QStringLiteral(
++            "\n[COMMAND INCOMPLETE] The diagnostic command exited without "
++            "a clean success result. Treat this section as incomplete, not "
++            "as proof of system health.\n");
++        result += accessContext();
+     }
+ 
+-    return QString::fromUtf8(p.readAllStandardOutput()) +
+-           QString::fromUtf8(p.readAllStandardError());
++    return result;
+ }
+ 
+ static QString readText(const QString &path, int maxBytes = 131072)
+ {
+     QFile f(path);
+ 
+-    if (!f.open(QIODevice::ReadOnly))
+-        return QStringLiteral("[unavailable]\n");
++    if (!f.open(QIODevice::ReadOnly)) {
++        return QStringLiteral(
++                   "[UNAVAILABLE] Could not read %1: %2\n%3")
++            .arg(path, f.errorString(), accessContext());
++    }
+ 
+     return QString::fromUtf8(f.read(maxBytes));
+ }
+@@ -418,6 +462,8 @@
+     out << "#ju56Us\n";
+     out << "CrashSentinel comprehensive diagnostics\n";
+     out << "These are captured observations, not a guarantee of root cause.\n";
++    out << "Package mode: " << StatePaths::packagingMode() << "\n";
++    out << StatePaths::stateExplanation() << "\n";
+ 
+     for (const Output &output : outputs) {
+         out << "\n\n============================================================\n";

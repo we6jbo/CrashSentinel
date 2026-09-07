@@ -1,0 +1,26 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: self_protection.h
+# generated: 2026-09-07T15:26:50-07:00
+
+--- before/self_protection.h
++++ after/self_protection.h
+@@ -7,6 +7,9 @@
+ {
+     bool quarantined = false;
+     int rapidFailures = 0;
++    int abnormalReboots = 0;
++    bool rebootGuardAcknowledged = false;
++    bool hardRebootStop = false;
+     QString reason;
+ };
+ 
+@@ -19,6 +22,8 @@
+     static bool clearQuarantine(const QString &stateDir, QString *error = nullptr);
+     static SelfProtectionState readState(const QString &stateDir);
+     static QString statePath(const QString &stateDir);
++    static QString disabledNoticePath(const QString &stateDir);
++    static bool resetRebootSafeguard(const QString &stateDir, QString *error = nullptr);
+ 
+ private:
+     static QString bootId();

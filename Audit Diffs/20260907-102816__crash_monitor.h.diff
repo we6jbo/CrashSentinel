@@ -1,0 +1,31 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: crash_monitor.h
+# generated: 2026-09-07T10:28:16-07:00
+
+--- /dev/null
++++ after/crash_monitor.h
+@@ -0,0 +1,23 @@
++#pragma once
++// #ju56Us
++
++#include <QObject>
++#include <QTimer>
++
++class CrashMonitor : public QObject
++{
++    Q_OBJECT
++public:
++    explicit CrashMonitor(QObject *parent = nullptr);
++    bool start();
++
++private slots:
++    void collect();
++
++private:
++    QString stateDir() const;
++    QString run(const QString &program, const QStringList &args, int timeoutMs = 5000) const;
++    bool writeAtomic(const QString &path, const QByteArray &data) const;
++
++    QTimer timer_;
++};

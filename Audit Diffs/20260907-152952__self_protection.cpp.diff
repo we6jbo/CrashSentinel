@@ -1,0 +1,30 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: self_protection.cpp
+# generated: 2026-09-07T15:29:52-07:00
+
+--- before/self_protection.cpp
++++ after/self_protection.cpp
+@@ -47,12 +47,16 @@
+         out << "PRECAUTIONARY STOP: the count reached at least 5. CrashSentinel may or may not be related to the crashes, so monitoring was stopped as a safety precaution.\n\n";
+     }
+ 
+-    out << "To re-enable monitoring deliberately:\n";
+-    out << "1. Open CrashSentinel -> Recovery & Diagnostics.\n";
+-    out << "2. Create a backup before repair.\n";
+-    out << "3. Choose Clear Self-Quarantine.\n";
+-    out << "4. Restart the CrashSentinel monitor/service.\n\n";
+-    out << "At the 20-reboot hard stop, use the explicit reboot-safeguard reset before restarting monitoring.\n\n";
++    out << "To re-enable monitoring deliberately after the 5-reboot stop:\n";
++    out << "  CrashSentinel --clear-quarantine\n\n";
++    out << "For a Snap installation, use the installed CrashSentinel command "
++           "with --clear-quarantine, then allow snapd to manage the monitor "
++           "service normally.\n\n";
++    out << "At the 20-reboot hard stop, normal quarantine clearing is refused. "
++           "The user must explicitly reset the reboot safeguard with:\n";
++    out << "  CrashSentinel --reset-reboot-safeguard\n\n";
++    out << "The 20-reboot reset clears the abnormal reboot counter. Use it only "
++           "after reviewing the crash evidence.\n\n";
+     out << "Do not interpret this safeguard as proof that CrashSentinel caused the reboot. It is intentionally conservative.\n";
+     return f.commit();
+ }

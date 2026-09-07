@@ -1,0 +1,124 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: context_provenance.cpp
+# generated: 2026-09-07T10:02:40-07:00
+
+--- /dev/null
++++ after/context_provenance.cpp
+@@ -0,0 +1,116 @@
++// #ju56Us
++#include "context_provenance.h"
++#include <QDir>
++#include <QFile>
++#include <QFileInfo>
++#include <QJsonArray>
++#include <QJsonDocument>
++#include <QJsonObject>
++#include <QProcess>
++#include <QSaveFile>
++#include <QStandardPaths>
++
++static QString s(const QJsonObject &o, const char *k) {
++    auto v=o.value(QLatin1String(k)); return v.isString()?v.toString():QString();
++}
++
++QString ContextProvenance::contextPath() {
++    QString e=qEnvironmentVariable("WE6JBO_CONTEXT_FILE");
++    return e.trimmed().isEmpty()
++        ? QStringLiteral("/home/we6jbo/.local/state/we6jbo-context/context.json")
++        : e;
++}
++
++MachineContext ContextProvenance::loadMachineContext() {
++    MachineContext c; c.sourcePath=contextPath();
++    QFile f(c.sourcePath); if(!f.open(QIODevice::ReadOnly)) return c;
++    QJsonParseError pe; auto d=QJsonDocument::fromJson(f.readAll(),&pe);
++    if(pe.error!=QJsonParseError::NoError || !d.isObject()) return c;
++
++    auto o=d.object(); c.schema=o.value("schema").toInt();
++    c.generatedAt=s(o,"generated_at"); c.date=s(o,"date"); c.weekday=s(o,"weekday");
++    c.timezone=s(o,"timezone"); c.locationLabel=s(o,"location_label");
++    auto t=o.value("time").toObject();
++    c.timeVisible=t.value("visible").toBool(false);
++    c.timePolicy=s(t,"policy");
++    c.timeDisplay=c.timeVisible?s(t,"display"):QString(); // enforce hidden-time policy
++    c.valid=true;
++    return c;
++}
++
++QString ContextProvenance::userVisibleContextSummary(const MachineContext &c) {
++    if(!c.valid) return "Machine context unavailable.";
++    QStringList x;
++    if(!c.date.isEmpty()) x<<"Date: "+c.date;
++    if(!c.weekday.isEmpty()) x<<"Weekday: "+c.weekday;
++    if(!c.timezone.isEmpty()) x<<"Timezone: "+c.timezone;
++    if(!c.locationLabel.isEmpty()) x<<"Location: "+c.locationLabel;
++    if(c.timeVisible && !c.timeDisplay.isEmpty())
++        x<<"Time: "+c.timeDisplay+(c.timePolicy.isEmpty()?"":" ("+c.timePolicy+")");
++    else
++        x<<"Time: hidden by context policy";
++    return x.join('\n');
++}
++
++QString ContextProvenance::generatedArtifactMetadata(const MachineContext &c) {
++    QStringList x;
++    x<<"project_id="+QString(ProjectId)<<"project_name="+QString(ProjectName)
++     <<"provenance_code="+QString(ProvenanceCode);
++    if(c.valid) {
++        if(!c.date.isEmpty()) x<<"context_date="+c.date;
++        if(!c.weekday.isEmpty()) x<<"context_weekday="+c.weekday;
++        if(!c.timezone.isEmpty()) x<<"context_timezone="+c.timezone;
++        if(!c.locationLabel.isEmpty()) x<<"context_location="+c.locationLabel;
++        x<<QString("context_time_visible=%1").arg(c.timeVisible?"true":"false");
++        if(c.timeVisible && !c.timeDisplay.isEmpty()) x<<"context_time_display="+c.timeDisplay;
++        if(!c.timePolicy.isEmpty()) x<<"context_time_policy="+c.timePolicy;
++    }
++    return x.join('\n');
++}
++
++QString ContextProvenance::tagGeneratedText(const QString &body,const MachineContext &c) {
++    return "----- CrashSentinel metadata -----\n"+generatedArtifactMetadata(c)+
++           "\n----- generated content -----\n"+body;
++}
++
++bool ContextProvenance::ensurePortableSnapshot(const QString &root, QString *err) {
++    QJsonObject o;
++    o["schema"]=1; o["project_id"]=ProjectId; o["project_name"]=ProjectName;
++    QJsonArray ids; ids.append(ProvenanceCode); o["identifiers"]=ids;
++    o["reference"]="User-supplied TG / AKA portable provenance contract";
++    o["portable"]=true; o["private_registry_required"]=false;
++    o["scope"]="Apply provenance only to artifacts, logs, GUI metadata, and communications created by CrashSentinel itself.";
++    o["registry_note"]="Normal operation does not require /home/we6jbo/.sstages/tg/tg_registry.db";
++
++    QSaveFile f(QDir(root).filePath("tg_context_snapshot.json"));
++    if(!f.open(QIODevice::WriteOnly)){ if(err)*err=f.errorString(); return false; }
++    f.write(QJsonDocument(o).toJson(QJsonDocument::Indented));
++    if(!f.commit()){ if(err)*err=f.errorString(); return false; }
++    return true;
++}
++
++bool ContextProvenance::attemptRegistrationOnce(const QString &root, QString *diag) {
++    QString state=QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
++    if(state.isEmpty()) return false;
++    QDir().mkpath(state);
++    QString marker=QDir(state).filePath("tg-registration-attempted");
++    if(QFileInfo::exists(marker)){ if(diag)*diag="Registration already attempted."; return true; }
++
++    QFile mf(marker); if(mf.open(QIODevice::WriteOnly)){ mf.write("attempted\n"); mf.close(); }
++
++    QString helper=QStandardPaths::findExecutable("tg-register-project");
++    if(helper.isEmpty()){ if(diag)*diag="tg-register-project not found; portable snapshot remains authoritative."; return false; }
++
++    QProcess p;
++    p.start(helper,{"--project-id",ProjectId,"--project-root",root,"--codes",ProvenanceCode,
++                    "--reference","User-supplied TG/AKA portable provenance contract"});
++    if(!p.waitForStarted(3000)) return false;
++    p.waitForFinished(10000);
++    bool ok=p.exitStatus()==QProcess::NormalExit && p.exitCode()==0;
++    if(diag)*diag=ok?"TG/AKA registration succeeded.":"TG/AKA registration failed; portable snapshot remains authoritative.";
++    return ok;
++}
++
++QString ContextProvenance::provenanceSummary() {
++    return QString("Project: %1\nProject ID: %2\nTG/AKA: %3").arg(ProjectName,ProjectId,ProvenanceCode);
++}

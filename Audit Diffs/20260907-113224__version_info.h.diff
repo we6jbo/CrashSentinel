@@ -1,0 +1,20 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: version_info.h
+# generated: 2026-09-07T11:32:24-07:00
+
+--- /dev/null
++++ after/version_info.h
+@@ -0,0 +1,12 @@
++#pragma once
++// #ju56Us
++
++namespace CrashSentinelVersion {
++inline constexpr const char *Version = "0.1.0-dev";
++inline constexpr const char *Channel = "development";
++inline constexpr const char *ProjectId = "page.j03.crashsentinel";
++inline constexpr const char *UpdatePage =
++    "https://j03.page/2026/09/07/crash-sentinel/";
++inline constexpr const char *UpdateAnchor =
++    "https://j03.page/2026/09/07/crash-sentinel/#updates";
++}

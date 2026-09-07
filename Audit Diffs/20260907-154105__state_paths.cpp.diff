@@ -1,0 +1,32 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: state_paths.cpp
+# generated: 2026-09-07T15:41:05-07:00
+
+--- before/state_paths.cpp
++++ after/state_paths.cpp
+@@ -1,4 +1,8 @@
+ // #ju56Us
++// READ ME: chooses CrashSentinel's state directory and explains package mode.
++// CRASHSENTINEL_STATE_DIR is an explicit override; SNAP_COMMON is used for Snap;
++// development/native falls back to Qt's per-user StateLocation.
++
+ #include "state_paths.h"
+ 
+ #include <QDir>
+@@ -12,6 +16,7 @@
+ }
+ }
+ 
++// IMPORTANT: both GUI and monitor must agree on this location to share evidence safely.
+ QString StatePaths::sharedStateDir()
+ {
+     const QString overrideDir =
+@@ -39,6 +44,7 @@
+     return QDir::cleanPath(state);
+ }
+ 
++// Small label used for diagnostics and status; it does not grant privileges.
+ QString StatePaths::packagingMode()
+ {
+     if (!cleanEnv("SNAP").isEmpty())

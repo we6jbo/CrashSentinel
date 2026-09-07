@@ -1,0 +1,19 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: deep_diagnostics.h
+# generated: 2026-09-07T14:57:23-07:00
+
+--- /dev/null
++++ after/deep_diagnostics.h
+@@ -0,0 +1,11 @@
++#pragma once
++// #ju56Us
++
++#include <QString>
++
++class DeepDiagnostics
++{
++public:
++    static bool writeReports(const QString &stateDir,
++                             QString *error = nullptr);
++};

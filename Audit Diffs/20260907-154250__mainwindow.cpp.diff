@@ -1,0 +1,17 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: mainwindow.cpp
+# generated: 2026-09-07T15:42:50-07:00
+
+--- before/mainwindow.cpp
++++ after/mainwindow.cpp
+@@ -3,8 +3,7 @@
+ // Qt Designer shows only the minimal mainwindow.ui placeholder; the runtime
+ // six-tab interface is assembled below with QWidget/QLayout objects.
+ // To change a tab, find its build...Tab() function. To change tab order, edit
+-// // START HERE FOR THE INTERFACE: creates the six tabs and controls their order.
+-MainWindow::MainWindow().
++// START HERE FOR THE INTERFACE: creates the six tabs and controls their order.
+ 
+ #include "mainwindow.h"
+ 

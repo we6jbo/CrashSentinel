@@ -1,0 +1,17 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: crash_monitor.h
+# generated: 2026-09-07T15:40:13-07:00
+
+--- before/crash_monitor.h
++++ after/crash_monitor.h
+@@ -1,4 +1,9 @@
+ #pragma once
++// READ ME: CrashMonitor is the recurring background evidence collector.
++// start() initializes monitoring; collect() performs one cycle. Helper methods
++// rotate history, read journals, analyze the previous boot, and report measured
++// service impact. ResourceGuard can slow/suspend expensive collection.
++
+ // #ju56Us
+ 
+ #include <QObject>

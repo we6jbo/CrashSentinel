@@ -1,0 +1,66 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: snapcraft.yaml
+# generated: 2026-09-07T15:13:00-07:00
+
+--- /dev/null
++++ after/snapcraft.yaml
+@@ -0,0 +1,58 @@
++# #ju56Us
++name: crashsentinel
++base: core24
++version: '0.1.0'
++summary: Diagnose unexplained Linux crashes and abrupt reboots
++description: |
++  CrashSentinel records lightweight system evidence before and after
++  unexplained crashes or abrupt reboots. It provides safeguards,
++  previous-boot analysis, recovery diagnostics, and report viewing.
++
++grade: devel
++confinement: strict
++
++apps:
++  crashsentinel:
++    command: usr/bin/CrashSentinel
++    extensions:
++      - kde-neon-6
++    plugs:
++      - desktop
++      - desktop-legacy
++      - wayland
++      - x11
++      - home
++      - network
++      - network-status
++
++  monitor:
++    command: usr/bin/CrashSentinel --service
++    daemon: simple
++    daemon-scope: system
++    install-mode: enable
++    restart-condition: on-failure
++    restart-delay: 10s
++    stop-mode: sigterm
++    stop-timeout: 20s
++    plugs:
++      - hardware-observe
++      - log-observe
++      - mount-observe
++      - network-observe
++      - system-observe
++
++parts:
++  crashsentinel:
++    plugin: cmake
++    source: .
++    build-packages:
++      - qt6-base-dev
++    stage-packages:
++      - libqt6core6
++      - libqt6gui6
++      - libqt6network6
++      - libqt6widgets6
++
++# Direct SMART access to raw block devices may require an interface or
++# confinement choice that receives additional Snap Store review.
++# Do not broaden device access merely to make SMART output appear.

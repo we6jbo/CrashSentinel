@@ -1,0 +1,46 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: main.cpp
+# generated: 2026-09-07T13:29:31-07:00
+
+--- before/main.cpp
++++ after/main.cpp
+@@ -6,6 +6,7 @@
+ #include "mainwindow.h"
+ #include "context_provenance.h"
+ #include "crash_monitor.h"
++#include "self_protection.h"
+ 
+ static bool serviceRequested(int argc, char *argv[])
+ {
+@@ -24,6 +25,21 @@
+         QCoreApplication::setOrganizationName(QStringLiteral("j03.page"));
+ 
+         CrashMonitor monitor;
++
++        const SelfProtectionState protection =
++            SelfProtection::noteServiceStart(monitor.publicStateDir());
++
++        if (protection.quarantined) {
++            qCritical().noquote()
++                << "CrashSentinel is self-quarantined:"
++                << protection.reason;
++            return 0;
++        }
++
++        QObject::connect(&app, &QCoreApplication::aboutToQuit, [&monitor] {
++            SelfProtection::noteCleanExit(monitor.publicStateDir());
++        });
++
+         if (!monitor.start()) {
+             qCritical() << "CrashSentinel service could not initialize its state directory.";
+             return 2;
+@@ -34,6 +50,8 @@
+     }
+ 
+     QApplication app(argc, argv);
++    QCoreApplication::setApplicationName(QStringLiteral("CrashSentinel"));
++    QCoreApplication::setOrganizationName(QStringLiteral("j03.page"));
+ 
+     const QString projectRoot = QCoreApplication::applicationDirPath();
+ 

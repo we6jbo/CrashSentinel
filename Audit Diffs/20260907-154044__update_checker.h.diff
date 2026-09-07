@@ -1,0 +1,16 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: update_checker.h
+# generated: 2026-09-07T15:40:44-07:00
+
+--- before/update_checker.h
++++ after/update_checker.h
+@@ -1,4 +1,8 @@
+ #pragma once
++// READ ME: asynchronous update-check interface.
++// CrashSentinel checks the project website for advertised version metadata; the
++// package manager/store remains the authority for actually installing updates.
++
+ // #ju56Us
+ 
+ #include <QObject>

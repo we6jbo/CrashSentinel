@@ -1,0 +1,25 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: crash_monitor.h
+# generated: 2026-09-07T10:57:22-07:00
+
+--- before/crash_monitor.h
++++ after/crash_monitor.h
+@@ -16,8 +16,16 @@
+ 
+ private:
+     QString stateDir() const;
+-    QString run(const QString &program, const QStringList &args, int timeoutMs = 5000) const;
++    QString run(const QString &program, const QStringList &args,
++                int timeoutMs = 5000) const;
+     bool writeAtomic(const QString &path, const QByteArray &data) const;
++    QString readFile(const QString &path) const;
++
++    void rotateHistory(const QByteArray &snapshot);
++    void writeJournalTail();
++    void pruneHistory(int keepCount);
++    void analyzePreviousBootOnce();
++    QString previousBootAnalysis() const;
+ 
+     QTimer timer_;
+ };

@@ -1,0 +1,16 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: deep_diagnostics.h
+# generated: 2026-09-07T15:40:57-07:00
+
+--- before/deep_diagnostics.h
++++ after/deep_diagnostics.h
+@@ -1,4 +1,8 @@
+ #pragma once
++// READ ME: one-shot deeper diagnostic report generator.
++// These collectors are read-only evidence gathering. Permission/confinement
++// failures must remain distinguishable from a healthy result.
++
+ // #ju56Us
+ 
+ #include <QString>

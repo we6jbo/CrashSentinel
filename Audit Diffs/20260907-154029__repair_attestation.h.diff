@@ -1,0 +1,16 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: repair_attestation.h
+# generated: 2026-09-07T15:40:29-07:00
+
+--- before/repair_attestation.h
++++ after/repair_attestation.h
+@@ -1,4 +1,8 @@
+ #pragma once
++// READ ME: creates a machine-local HMAC attestation showing that CrashSentinel
++// recently ran and wrote evidence. It is NOT a certificate of hardware health
++// and must never be described as one.
++
+ // #ju56Us
+ 
+ #include <QString>

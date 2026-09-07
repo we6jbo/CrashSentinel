@@ -1,0 +1,98 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: update_checker.cpp
+# generated: 2026-09-07T11:32:41-07:00
+
+--- /dev/null
++++ after/update_checker.cpp
+@@ -0,0 +1,90 @@
++// #ju56Us
++#include "update_checker.h"
++#include "version_info.h"
++
++#include <QNetworkReply>
++#include <QRegularExpression>
++#include <QUrl>
++
++static QList<int> semverParts(QString v)
++{
++    v = v.trimmed();
++    v.remove(QRegularExpression("^[^0-9]*"));
++    v = v.section('-', 0, 0);
++    QList<int> p;
++    for (const QString &part : v.split('.'))
++        p << part.toInt();
++    while (p.size() < 3) p << 0;
++    return p;
++}
++
++static bool newerThan(const QString &candidate, const QString &current)
++{
++    const auto a = semverParts(candidate);
++    const auto b = semverParts(current);
++    for (int i = 0; i < qMin(a.size(), b.size()); ++i) {
++        if (a[i] != b[i]) return a[i] > b[i];
++    }
++    return false;
++}
++
++UpdateChecker::UpdateChecker(QObject *parent) : QObject(parent) {}
++
++void UpdateChecker::check()
++{
++    QNetworkRequest request(QUrl(CrashSentinelVersion::UpdatePage));
++    request.setHeader(QNetworkRequest::UserAgentHeader,
++                      "CrashSentinel/0.1 update-check");
++    QNetworkReply *reply = network_.get(request);
++
++    connect(reply, &QNetworkReply::finished, this, [this, reply] {
++        UpdateResult r;
++        r.instructionsUrl = CrashSentinelVersion::UpdateAnchor;
++
++        if (reply->error() != QNetworkReply::NoError) {
++            r.message = "Update check failed: " + reply->errorString();
++            reply->deleteLater();
++            emit finished(r);
++            return;
++        }
++
++        const QString html = QString::fromUtf8(reply->readAll());
++        reply->deleteLater();
++
++        // WordPress Custom HTML block format:
++        // <div id="crashsentinel-update"
++        //      data-version="0.1.0"
++        //      data-update-url="https://.../#updates"></div>
++        QRegularExpression versionRe(
++            R"(id\s*=\s*["']crashsentinel-update["'][^>]*data-version\s*=\s*["']([^"']+)["'])",
++            QRegularExpression::CaseInsensitiveOption);
++        QRegularExpression urlRe(
++            R"(id\s*=\s*["']crashsentinel-update["'][^>]*data-update-url\s*=\s*["']([^"']+)["'])",
++            QRegularExpression::CaseInsensitiveOption);
++
++        const auto vm = versionRe.match(html);
++        if (!vm.hasMatch()) {
++            r.message =
++                "The update page was reachable, but no CrashSentinel update "
++                "manifest was found.";
++            emit finished(r);
++            return;
++        }
++
++        r.checkSucceeded = true;
++        r.availableVersion = vm.captured(1).trimmed();
++
++        const auto um = urlRe.match(html);
++        if (um.hasMatch())
++            r.instructionsUrl = um.captured(1).trimmed();
++
++        r.updateAvailable =
++            newerThan(r.availableVersion, CrashSentinelVersion::Version);
++
++        r.message = r.updateAvailable
++            ? QString("Update available: %1").arg(r.availableVersion)
++            : QString("No newer update advertised. Installed: %1")
++                  .arg(CrashSentinelVersion::Version);
++        emit finished(r);
++    });
++}

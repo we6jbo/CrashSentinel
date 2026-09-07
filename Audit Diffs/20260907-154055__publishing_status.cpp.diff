@@ -1,0 +1,24 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: publishing_status.cpp
+# generated: 2026-09-07T15:40:55-07:00
+
+--- before/publishing_status.cpp
++++ after/publishing_status.cpp
+@@ -1,4 +1,8 @@
+ // #ju56Us
++// READ ME: performs LOCAL publication-preparation checks only.
++// Never convert a local file check into a claim that an external service has
++// published or reviewed the project.
++
+ #include "publishing_status.h"
+ 
+ #include <QDir>
+@@ -87,6 +91,7 @@
+     return true;
+ }
+ 
++// Detect only facts visible in the local project tree and Git configuration.
+ PublishingStatus PublishingStatusBuilder::detect(
+     const QString &projectRoot)
+ {

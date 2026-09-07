@@ -1,0 +1,48 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: mainwindow.h
+# generated: 2026-09-07T14:34:56-07:00
+
+--- before/mainwindow.h
++++ after/mainwindow.h
+@@ -9,6 +9,7 @@
+ class QPlainTextEdit;
+ class QPushButton;
+ class UpdateChecker;
++class QTabWidget;
+ 
+ class MainWindow : public QMainWindow
+ {
+@@ -24,9 +25,15 @@
+     void checkForUpdates();
+     void openUpdateInstructions();
+     void clearQuarantine();
++    void verifyPublishingSetup();
++    void hidePublishingTab();
++    void showPublishingTab();
++    void noteScrollDiscovered();
++    void tickScrollDiscoveryUsage();
+ 
+ private:
+     QWidget *makeScrollable(QWidget *content);
++    QWidget *buildPublishingTab();
+     QWidget *buildStatusTab();
+     QWidget *buildSafeguardsTab();
+     QWidget *buildProfilesTab();
+@@ -45,6 +52,16 @@
+     QPushButton *clearRecoveryQuarantineButton_ = nullptr;
+     QPushButton *rebuildRecoveryReportsButton_ = nullptr;
+ 
++    QTabWidget *tabs_ = nullptr;
++    QWidget *publishingTabPage_ = nullptr;
++    QLabel *publishingSummary_ = nullptr;
++    QPlainTextEdit *publishingDetails_ = nullptr;
++    QPushButton *hidePublishingButton_ = nullptr;
++    QLabel *scrollDiscoveryHint_ = nullptr;
++    QTimer *scrollDiscoveryTimer_ = nullptr;
++    int scrollDiscoveryUsageSeconds_ = 0;
++    bool scrollDiscovered_ = false;
++
+     QLabel *versionLabel_ = nullptr;
+     QLabel *statusLabel_ = nullptr;
+     QLabel *configPathLabel_ = nullptr;

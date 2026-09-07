@@ -1,0 +1,15 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: state_paths.h
+# generated: 2026-09-07T15:41:02-07:00
+
+--- before/state_paths.h
++++ after/state_paths.h
+@@ -1,4 +1,7 @@
+ #pragma once
++// READ ME: single source of truth for packaged/shared state locations.
++// GUI and daemon must resolve compatible state paths, especially for Snap.
++
+ // #ju56Us
+ 
+ #include <QString>

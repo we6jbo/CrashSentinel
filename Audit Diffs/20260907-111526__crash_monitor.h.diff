@@ -1,0 +1,39 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: crash_monitor.h
+# generated: 2026-09-07T11:15:26-07:00
+
+--- before/crash_monitor.h
++++ after/crash_monitor.h
+@@ -3,6 +3,7 @@
+ 
+ #include <QObject>
+ #include <QTimer>
++#include "crash_settings.h"
+ 
+ class CrashMonitor : public QObject
+ {
+@@ -16,16 +17,21 @@
+ 
+ private:
+     QString stateDir() const;
+-    QString run(const QString &program, const QStringList &args,
+-                int timeoutMs = 5000) const;
++    QString run(const QString &program, const QStringList &args, int timeoutMs = 5000) const;
+     bool writeAtomic(const QString &path, const QByteArray &data) const;
+     QString readFile(const QString &path) const;
+ 
+     void rotateHistory(const QByteArray &snapshot);
+     void writeJournalTail();
+     void pruneHistory(int keepCount);
++    void purgeForDiskPressure();
++    void pruneByAge(int retentionDays);
+     void analyzePreviousBootOnce();
+     QString previousBootAnalysis() const;
++    void writeFinalStopLog(const QStringList &reasons);
++    void applyTimerInterval(int seconds);
+ 
+     QTimer timer_;
++    CrashSettings settings_;
++    bool suspendedForCriticalResource_ = false;
+ };

@@ -1,0 +1,29 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: crash_monitor.h
+# generated: 2026-09-07T13:29:41-07:00
+
+--- before/crash_monitor.h
++++ after/crash_monitor.h
+@@ -12,6 +12,10 @@
+     explicit CrashMonitor(QObject *parent = nullptr);
+     bool start();
+ 
++    // Exposed only so service startup/self-protection can use the exact same
++    // state directory as the monitor.
++    QString publicStateDir() const;
++
+ private slots:
+     void collect();
+ 
+@@ -30,6 +34,10 @@
+     QString previousBootAnalysis() const;
+     void writeFinalStopLog(const QStringList &reasons);
+     void applyTimerInterval(int seconds);
++    void writeServiceHealth(qint64 collectionMs,
++                            qint64 snapshotBytes,
++                            const QString &mode,
++                            const QStringList &reasons) const;
+ 
+     QTimer timer_;
+     CrashSettings settings_;

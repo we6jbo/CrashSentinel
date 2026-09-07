@@ -1,0 +1,24 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: status_snapshot.cpp
+# generated: 2026-09-07T15:40:41-07:00
+
+--- before/status_snapshot.cpp
++++ after/status_snapshot.cpp
+@@ -1,4 +1,8 @@
+ // #ju56Us
++// READ ME: converts state files and environment information into plain-language
++// status for the GUI. Missing evidence is reported as missing; do not infer
++// health from absence.
++
+ #include "status_snapshot.h"
+ #include "self_protection.h"
+ #include "version_info.h"
+@@ -33,6 +37,7 @@
+                            : lines.join("\n");
+ }
+ 
++// Gather current state into a presentation-friendly snapshot for the GUI.
+ StatusSnapshot StatusSnapshotBuilder::build()
+ {
+     StatusSnapshot s;

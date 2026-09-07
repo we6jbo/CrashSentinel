@@ -1,0 +1,15 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: crash_monitor.cpp
+# generated: 2026-09-07T14:12:18-07:00
+
+--- before/crash_monitor.cpp
++++ after/crash_monitor.cpp
+@@ -256,7 +256,6 @@
+         {"oom-kill", "CONFIRMED", "OOM killer activity"},
+         {"mce:", "CONFIRMED", "Machine Check Exception"},
+         {"hardware error", "CONFIRMED", "Hardware error"},
+-        {"edac", "SUSPICIOUS", "EDAC-related message"},
+         {"i/o error", "CONFIRMED", "Storage I/O error"},
+         {"btrfs error", "CONFIRMED", "Btrfs error"},
+         {"tree-log replay", "SUSPICIOUS", "Btrfs tree-log replay / unclean-stop recovery"},

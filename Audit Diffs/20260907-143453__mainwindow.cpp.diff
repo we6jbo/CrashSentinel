@@ -1,0 +1,332 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: mainwindow.cpp
+# generated: 2026-09-07T14:34:53-07:00
+
+--- before/mainwindow.cpp
++++ after/mainwindow.cpp
+@@ -5,6 +5,7 @@
+ #include "resource_guard.h"
+ #include "self_protection.h"
+ #include "recovery_diagnostics.h"
++#include "publishing_status.h"
+ #include "status_snapshot.h"
+ #include "update_checker.h"
+ #include "version_info.h"
+@@ -18,6 +19,9 @@
+ #include <QLabel>
+ #include <QPlainTextEdit>
+ #include <QPushButton>
++#include <QSettings>
++#include <QScrollBar>
++#include <QCoreApplication>
+ #include <QTimer>
+ #include <QScrollArea>
+ #include <QSpinBox>
+@@ -50,19 +54,59 @@
+         checkUpdatesButton_->setEnabled(true);
+     });
+ 
+-    auto *tabs = new QTabWidget(this);
+-    tabs->addTab(makeScrollable(buildStatusTab()),
+-                 QStringLiteral("Status"));
+-    tabs->addTab(makeScrollable(buildSafeguardsTab()),
+-                 QStringLiteral("Safeguards"));
+-    tabs->addTab(makeScrollable(buildProfilesTab()),
+-                 QStringLiteral("Profiles"));
+-    tabs->addTab(makeScrollable(buildReportsTab()),
+-                 QStringLiteral("Reports"));
+-    tabs->addTab(makeScrollable(buildRecoveryDiagnosticsTab()),
+-                 QStringLiteral("Recovery & Diagnostics"));
++    auto *central = new QWidget(this);
++    auto *centralLayout = new QVBoxLayout(central);
+ 
+-    setCentralWidget(tabs);
++    scrollDiscoveryHint_ = new QLabel(
++        QStringLiteral(
++            "<b>More options may be available below.</b> "
++            "Scroll down to see the rest of a tab."));
++    scrollDiscoveryHint_->setWordWrap(true);
++    scrollDiscoveryHint_->setVisible(false);
++
++    tabs_ = new QTabWidget(this);
++
++    publishingTabPage_ = makeScrollable(buildPublishingTab());
++
++    if (!PublishingStatusBuilder::isHiddenByUser())
++        tabs_->addTab(
++            publishingTabPage_,
++            QStringLiteral("Install & Publish"));
++
++    tabs_->addTab(makeScrollable(buildStatusTab()),
++                  QStringLiteral("Status"));
++    tabs_->addTab(makeScrollable(buildSafeguardsTab()),
++                  QStringLiteral("Safeguards"));
++    tabs_->addTab(makeScrollable(buildProfilesTab()),
++                  QStringLiteral("Profiles"));
++    tabs_->addTab(makeScrollable(buildReportsTab()),
++                  QStringLiteral("Reports"));
++    tabs_->addTab(makeScrollable(buildRecoveryDiagnosticsTab()),
++                  QStringLiteral("Recovery & Diagnostics"));
++
++    centralLayout->addWidget(scrollDiscoveryHint_);
++    centralLayout->addWidget(tabs_);
++    setCentralWidget(central);
++
++    QSettings discoverySettings;
++    scrollDiscovered_ =
++        discoverySettings.value(
++            QStringLiteral("ui/scroll_discovered"),
++            false).toBool();
++
++    scrollDiscoveryUsageSeconds_ =
++        discoverySettings.value(
++            QStringLiteral("ui/scroll_discovery_usage_seconds"),
++            0).toInt();
++
++    scrollDiscoveryTimer_ = new QTimer(this);
++    scrollDiscoveryTimer_->setInterval(1000);
++
++    connect(scrollDiscoveryTimer_, &QTimer::timeout,
++            this, &MainWindow::tickScrollDiscoveryUsage);
++
++    if (!scrollDiscovered_)
++        scrollDiscoveryTimer_->start();
+ 
+     loadSettingsIntoUi();
+     refreshStatus();
+@@ -73,9 +117,74 @@
+     auto *scroll = new QScrollArea;
+     scroll->setWidgetResizable(true);
+     scroll->setWidget(content);
++
++    connect(scroll->verticalScrollBar(),
++            &QScrollBar::valueChanged,
++            this,
++            [this](int value) {
++                if (value != 0)
++                    noteScrollDiscovered();
++            });
++
+     return scroll;
+ }
+ 
++QWidget *MainWindow::buildPublishingTab()
++{
++    auto *w = new QWidget;
++    auto *v = new QVBoxLayout(w);
++
++    auto *title =
++        new QLabel(
++            QStringLiteral("<h2>Install &amp; Publish</h2>"));
++    title->setWordWrap(true);
++
++    auto *intro =
++        new QLabel(
++            QStringLiteral(
++                "This tab verifies what CrashSentinel can confirm "
++                "locally for GitHub, Snap, and Flatpak/Flathub. "
++                "External publication or store review is never "
++                "assumed merely because local files exist."));
++    intro->setWordWrap(true);
++
++    publishingSummary_ = new QLabel;
++    publishingSummary_->setWordWrap(true);
++
++    publishingDetails_ = new QPlainTextEdit;
++    publishingDetails_->setReadOnly(true);
++    publishingDetails_->setMinimumHeight(360);
++
++    auto *verify =
++        new QPushButton(
++            QStringLiteral(
++                "Verify Installation & Publishing Steps"));
++
++    hidePublishingButton_ =
++        new QPushButton(
++            QStringLiteral(
++                "Hide Install & Publish After Setup"));
++
++    connect(verify, &QPushButton::clicked,
++            this, &MainWindow::verifyPublishingSetup);
++
++    connect(hidePublishingButton_, &QPushButton::clicked,
++            this, &MainWindow::hidePublishingTab);
++
++    v->addWidget(title);
++    v->addWidget(intro);
++    v->addWidget(publishingSummary_);
++    v->addWidget(publishingDetails_);
++    v->addWidget(verify);
++    v->addWidget(hidePublishingButton_);
++    v->addStretch();
++
++    QTimer::singleShot(
++        0, this, &MainWindow::verifyPublishingSetup);
++
++    return w;
++}
++
+ QWidget *MainWindow::buildStatusTab()
+ {
+     auto *w = new QWidget;
+@@ -306,6 +415,9 @@
+ 
+     auto *exportButton =
+         new QPushButton(QStringLiteral("Export Diagnostic Report"));
++    auto *showPublishing =
++        new QPushButton(
++            QStringLiteral("Show Install & Publish Tab Again"));
+ 
+     connect(refresh, &QPushButton::clicked,
+             this, &MainWindow::refreshRecoveryDiagnostics);
+@@ -317,6 +429,8 @@
+             this, &MainWindow::rebuildRecoveryReports);
+     connect(exportButton, &QPushButton::clicked,
+             this, &MainWindow::exportRecoveryDiagnostics);
++    connect(showPublishing, &QPushButton::clicked,
++            this, &MainWindow::showPublishingTab);
+ 
+     v->addWidget(title);
+     v->addWidget(intro);
+@@ -327,6 +441,7 @@
+     v->addWidget(clearRecoveryQuarantineButton_);
+     v->addWidget(rebuildRecoveryReportsButton_);
+     v->addWidget(exportButton);
++    v->addWidget(showPublishing);
+     v->addStretch();
+ 
+     QTimer::singleShot(0, this, &MainWindow::refreshRecoveryDiagnostics);
+@@ -682,3 +797,132 @@
+         QStringLiteral("<b>Diagnostic report exported:</b> %1")
+             .arg(path.toHtmlEscaped()));
+ }
++
++
++void MainWindow::verifyPublishingSetup()
++{
++    QString root =
++        qEnvironmentVariable(
++            "CRASHSENTINEL_PROJECT_ROOT");
++
++    if (root.isEmpty()) {
++        QDir d(
++            QCoreApplication::applicationDirPath());
++
++        for (int i = 0; i < 7; ++i) {
++            if (QFile::exists(d.filePath("CMakeLists.txt")) &&
++                QFile::exists(d.filePath("main.cpp"))) {
++                root = d.absolutePath();
++                break;
++            }
++
++            if (!d.cdUp())
++                break;
++        }
++    }
++
++    const PublishingStatus status =
++        PublishingStatusBuilder::detect(root);
++
++    publishingDetails_->setPlainText(status.details);
++
++    hidePublishingButton_->setEnabled(
++        status.allLocalChecksPass);
++
++    publishingSummary_->setText(
++        status.allLocalChecksPass
++            ? QStringLiteral(
++                  "<b>All local preparation checks pass.</b> "
++                  "If the external publication steps are also complete, "
++                  "you may hide this tab.")
++            : QStringLiteral(
++                  "<b>Publishing setup is incomplete.</b> "
++                  "The details below show what remains locally."));
++}
++
++void MainWindow::hidePublishingTab()
++{
++    QString error;
++
++    if (!PublishingStatusBuilder::setHiddenByUser(
++            true, &error)) {
++        publishingSummary_->setText(
++            QStringLiteral(
++                "<b>Could not hide tab:</b> %1")
++                .arg(error.toHtmlEscaped()));
++        return;
++    }
++
++    const int index =
++        tabs_->indexOf(publishingTabPage_);
++
++    if (index >= 0)
++        tabs_->removeTab(index);
++}
++
++void MainWindow::showPublishingTab()
++{
++    QString error;
++
++    if (!PublishingStatusBuilder::setHiddenByUser(
++            false, &error)) {
++        if (recoverySummary_) {
++            recoverySummary_->setText(
++                QStringLiteral(
++                    "<b>Could not restore Install &amp; Publish:</b> %1")
++                    .arg(error.toHtmlEscaped()));
++        }
++        return;
++    }
++
++    if (tabs_->indexOf(publishingTabPage_) < 0)
++        tabs_->insertTab(
++            0,
++            publishingTabPage_,
++            QStringLiteral("Install & Publish"));
++
++    tabs_->setCurrentWidget(publishingTabPage_);
++    verifyPublishingSetup();
++}
++
++void MainWindow::noteScrollDiscovered()
++{
++    if (scrollDiscovered_)
++        return;
++
++    scrollDiscovered_ = true;
++
++    if (scrollDiscoveryTimer_)
++        scrollDiscoveryTimer_->stop();
++
++    if (scrollDiscoveryHint_)
++        scrollDiscoveryHint_->setVisible(false);
++
++    QSettings settings;
++    settings.setValue(
++        QStringLiteral("ui/scroll_discovered"),
++        true);
++    settings.setValue(
++        QStringLiteral("ui/scroll_discovery_usage_seconds"),
++        scrollDiscoveryUsageSeconds_);
++}
++
++void MainWindow::tickScrollDiscoveryUsage()
++{
++    if (scrollDiscovered_)
++        return;
++
++    ++scrollDiscoveryUsageSeconds_;
++
++    if ((scrollDiscoveryUsageSeconds_ % 15) == 0) {
++        QSettings settings;
++        settings.setValue(
++            QStringLiteral("ui/scroll_discovery_usage_seconds"),
++            scrollDiscoveryUsageSeconds_);
++    }
++
++    if (scrollDiscoveryUsageSeconds_ >= 300 &&
++        scrollDiscoveryHint_) {
++        scrollDiscoveryHint_->setVisible(true);
++    }
++}

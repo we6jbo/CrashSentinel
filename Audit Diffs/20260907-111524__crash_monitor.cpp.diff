@@ -1,0 +1,552 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: crash_monitor.cpp
+# generated: 2026-09-07T11:15:24-07:00
+
+--- before/crash_monitor.cpp
++++ after/crash_monitor.cpp
+@@ -2,8 +2,8 @@
+ #include "crash_monitor.h"
+ #include "context_provenance.h"
+ #include "repair_attestation.h"
++#include "resource_guard.h"
+ 
+-#include <QCoreApplication>
+ #include <QCryptographicHash>
+ #include <QDateTime>
+ #include <QDir>
+@@ -14,73 +14,53 @@
+ #include <QStandardPaths>
+ #include <QTextStream>
+ 
+-
+ static QString monotonicSeconds()
+ {
+-    QFile f(QStringLiteral("/proc/uptime"));
+-    if (!f.open(QIODevice::ReadOnly))
+-        return QStringLiteral("unknown");
++    QFile f("/proc/uptime");
++    if (!f.open(QIODevice::ReadOnly)) return "unknown";
+     return QString::fromUtf8(f.readLine().split(' ').value(0));
+ }
+ 
+ static QString contextVisibleStamp(const MachineContext &ctx)
+ {
+     if (!ctx.timeVisible)
+-        return ctx.date.isEmpty()
+-            ? QStringLiteral("time-hidden-by-policy")
+-            : ctx.date + QStringLiteral(" time-hidden-by-policy");
+-
+-    QString value = ctx.date;
+-    if (!ctx.timeDisplay.isEmpty())
+-        value += QStringLiteral(" ") + ctx.timeDisplay;
+-    if (!ctx.timezone.isEmpty())
+-        value += QStringLiteral(" ") + ctx.timezone;
+-    if (!ctx.timePolicy.isEmpty())
+-        value += QStringLiteral(" (") + ctx.timePolicy + QStringLiteral(")");
+-    return value;
++        return ctx.date.isEmpty() ? "time-hidden-by-policy" : ctx.date + " time-hidden-by-policy";
++    QString v = ctx.date;
++    if (!ctx.timeDisplay.isEmpty()) v += " " + ctx.timeDisplay;
++    if (!ctx.timezone.isEmpty()) v += " " + ctx.timezone;
++    if (!ctx.timePolicy.isEmpty()) v += " (" + ctx.timePolicy + ")";
++    return v;
+ }
+ 
+ CrashMonitor::CrashMonitor(QObject *parent) : QObject(parent)
+ {
+-    timer_.setInterval(20000);
+     connect(&timer_, &QTimer::timeout, this, &CrashMonitor::collect);
+ }
+ 
+ QString CrashMonitor::stateDir() const
+ {
+     const QString overrideDir = qEnvironmentVariable("CRASHSENTINEL_STATE_DIR");
+-    if (!overrideDir.trimmed().isEmpty())
+-        return overrideDir;
+-
++    if (!overrideDir.trimmed().isEmpty()) return overrideDir;
+     QString base = QStandardPaths::writableLocation(QStandardPaths::StateLocation);
+-    if (base.isEmpty())
+-        base = QDir::homePath() + QStringLiteral("/.local/state/CrashSentinel");
++    if (base.isEmpty()) base = QDir::homePath() + "/.local/state/CrashSentinel";
+     return base;
+ }
+ 
+-QString CrashMonitor::run(const QString &program, const QStringList &args,
+-                          int timeoutMs) const
++QString CrashMonitor::run(const QString &program, const QStringList &args, int timeoutMs) const
+ {
+     QProcess p;
+     p.start(program, args);
+-    if (!p.waitForStarted(1500))
+-        return QStringLiteral("[unavailable]\n");
+-
++    if (!p.waitForStarted(1500)) return "[unavailable]\n";
+     if (!p.waitForFinished(timeoutMs)) {
+-        p.kill();
+-        p.waitForFinished(1000);
+-        return QStringLiteral("[timed out]\n");
++        p.kill(); p.waitForFinished(1000); return "[timed out]\n";
+     }
+-
+-    return QString::fromUtf8(p.readAllStandardOutput()) +
+-           QString::fromUtf8(p.readAllStandardError());
++    return QString::fromUtf8(p.readAllStandardOutput()) + QString::fromUtf8(p.readAllStandardError());
+ }
+ 
+ bool CrashMonitor::writeAtomic(const QString &path, const QByteArray &data) const
+ {
+     QSaveFile f(path);
+-    if (!f.open(QIODevice::WriteOnly))
+-        return false;
++    if (!f.open(QIODevice::WriteOnly)) return false;
+     f.write(data);
+     return f.commit();
+ }
+@@ -88,275 +68,232 @@
+ QString CrashMonitor::readFile(const QString &path) const
+ {
+     QFile f(path);
+-    if (!f.open(QIODevice::ReadOnly))
+-        return QStringLiteral("[unavailable]\n");
++    if (!f.open(QIODevice::ReadOnly)) return "[unavailable]\n";
+     return QString::fromUtf8(f.readAll());
+ }
+ 
++void CrashMonitor::applyTimerInterval(int seconds)
++{
++    const int ms = qBound(20, seconds, 600) * 1000;
++    if (timer_.interval() != ms)
++        timer_.setInterval(ms);
++}
++
+ void CrashMonitor::pruneHistory(int keepCount)
+ {
+-    QDir history(QDir(stateDir()).filePath(QStringLiteral("history")));
+-    if (!history.exists())
+-        return;
++    QDir h(QDir(stateDir()).filePath("history"));
++    QFileInfoList files = h.entryInfoList({"snapshot-*.txt"}, QDir::Files, QDir::Time);
++    for (int i = keepCount; i < files.size(); ++i)
++        QFile::remove(files.at(i).absoluteFilePath());
++}
+ 
+-    QFileInfoList files =
+-        history.entryInfoList({QStringLiteral("snapshot-*.txt")},
+-                              QDir::Files, QDir::Time);
++void CrashMonitor::pruneByAge(int retentionDays)
++{
++    const QDateTime cutoff = QDateTime::currentDateTime().addDays(-qMax(1, retentionDays));
++    for (const QString &sub : {"history", "reports"}) {
++        QDir d(QDir(stateDir()).filePath(sub));
++        for (const QFileInfo &fi : d.entryInfoList(QDir::Files)) {
++            if (fi.lastModified() < cutoff)
++                QFile::remove(fi.absoluteFilePath());
++        }
++    }
++}
+ 
+-    for (int i = keepCount; i < files.size(); ++i)
++void CrashMonitor::purgeForDiskPressure()
++{
++    QDir h(QDir(stateDir()).filePath("history"));
++    QFileInfoList files = h.entryInfoList({"snapshot-*.txt"}, QDir::Files, QDir::Time);
++    // Preserve the newest four snapshots even in protective purge mode.
++    for (int i = 4; i < files.size(); ++i)
+         QFile::remove(files.at(i).absoluteFilePath());
+ }
+ 
+ void CrashMonitor::rotateHistory(const QByteArray &snapshot)
+ {
+-    const QString historyDir =
+-        QDir(stateDir()).filePath(QStringLiteral("history"));
+-    QDir().mkpath(historyDir);
+-
+-    const QString stamp =
+-        QStringLiteral("uptime-%1").arg(monotonicSeconds().replace('.', '_'));
+-    writeAtomic(QDir(historyDir).filePath(
+-                    QStringLiteral("snapshot-%1.txt").arg(stamp)),
+-                snapshot);
+-
+-    // 18 snapshots at 20-second intervals retains roughly six minutes.
++    const QString dir = QDir(stateDir()).filePath("history");
++    QDir().mkpath(dir);
++    const QString stamp = "uptime-" + monotonicSeconds().replace('.', '_');
++    writeAtomic(QDir(dir).filePath("snapshot-" + stamp + ".txt"), snapshot);
+     pruneHistory(18);
+ }
+ 
+ void CrashMonitor::writeJournalTail()
+ {
+-    const QString tail =
+-        run(QStringLiteral("journalctl"),
+-            {QStringLiteral("-b"), QStringLiteral("0"),
+-             QStringLiteral("-n"), QStringLiteral("250"),
+-             QStringLiteral("--no-pager"),
+-             QStringLiteral("-o"), QStringLiteral("short-precise")},
+-            7000);
+-
+-    writeAtomic(QDir(stateDir()).filePath(QStringLiteral("journal-tail-current.txt")),
+-                tail.toUtf8());
++    const QString tail = run("journalctl", {"-b","0","-n","250","--no-pager","-o","short-precise"}, 7000);
++    writeAtomic(QDir(stateDir()).filePath("journal-tail-current.txt"), tail.toUtf8());
+ }
+ 
+ QString CrashMonitor::previousBootAnalysis() const
+ {
+-    const QString full =
+-        run(QStringLiteral("journalctl"),
+-            {QStringLiteral("-b"), QStringLiteral("-1"),
+-             QStringLiteral("-n"), QStringLiteral("600"),
+-             QStringLiteral("--no-pager"),
+-             QStringLiteral("-o"), QStringLiteral("short-precise")},
+-            12000);
+-
+-    const QString kernel =
+-        run(QStringLiteral("journalctl"),
+-            {QStringLiteral("-b"), QStringLiteral("-1"),
+-             QStringLiteral("-k"), QStringLiteral("--no-pager"),
+-             QStringLiteral("-o"), QStringLiteral("short-precise")},
+-            12000);
+-
+-    const QString warnings =
+-        run(QStringLiteral("journalctl"),
+-            {QStringLiteral("-b"), QStringLiteral("-1"),
+-             QStringLiteral("-p"), QStringLiteral("warning..alert"),
+-             QStringLiteral("--no-pager"),
+-             QStringLiteral("-o"), QStringLiteral("short-precise")},
+-            12000);
+-
+-    const QString all = (full + "\n" + kernel + "\n" + warnings).toLower();
+-
+-    QStringList findings;
+-    auto hit = [&](const QString &needle, const QString &message) {
+-        if (all.contains(needle))
+-            findings << message;
++    const QString full = run("journalctl", {"-b","-1","-n","600","--no-pager","-o","short-precise"}, 12000);
++    const QString kernel = run("journalctl", {"-b","-1","-k","--no-pager","-o","short-precise"}, 12000);
++    const QString warnings = run("journalctl", {"-b","-1","-p","warning..alert","--no-pager","-o","short-precise"}, 12000);
++
++    struct Rule { QString needle, severity, label; };
++    const QList<Rule> rules = {
++        {"kernel panic","CONFIRMED","Kernel panic signature"},
++        {"soft lockup","CONFIRMED","CPU soft lockup"},
++        {"hard lockup","CONFIRMED","CPU hard lockup"},
++        {"hung task","CONFIRMED","Hung task"},
++        {"out of memory","CONFIRMED","Out-of-memory condition"},
++        {"oom-kill","CONFIRMED","OOM killer activity"},
++        {"mce:","CONFIRMED","Machine Check Exception"},
++        {"hardware error","CONFIRMED","Hardware error"},
++        {"edac","SUSPICIOUS","EDAC-related message"},
++        {"i/o error","CONFIRMED","Storage I/O error"},
++        {"btrfs error","CONFIRMED","Btrfs error"},
++        {"tree-log replay","SUSPICIOUS","Btrfs tree-log replay / unclean-stop recovery"},
++        {"pcie bus error","CONFIRMED","PCIe bus error"},
++        {"acpi error","SUSPICIOUS","ACPI firmware/interpreter error"},
++        {"gpu hang","CONFIRMED","GPU hang"},
++        {"critical temperature","CONFIRMED","Critical temperature"},
++        {"thermal thrott","SUSPICIOUS","Thermal throttling"},
++        {"journal corrupted or uncleanly shut down","CONFIRMED","Unclean journal shutdown/corruption"}
+     };
+ 
+-    hit(QStringLiteral("kernel panic"), QStringLiteral("Kernel panic signature found."));
+-    hit(QStringLiteral("soft lockup"), QStringLiteral("CPU soft lockup signature found."));
+-    hit(QStringLiteral("hard lockup"), QStringLiteral("CPU hard lockup signature found."));
+-    hit(QStringLiteral("hung task"), QStringLiteral("Hung task signature found."));
+-    hit(QStringLiteral("watchdog: bug"), QStringLiteral("Watchdog failure signature found."));
+-    hit(QStringLiteral("out of memory"), QStringLiteral("Out-of-memory signature found."));
+-    hit(QStringLiteral("oom-kill"), QStringLiteral("OOM killer activity found."));
+-    hit(QStringLiteral("hardware error"), QStringLiteral("Hardware error text found."));
+-    hit(QStringLiteral("mce:"), QStringLiteral("Machine Check Exception text found."));
+-    hit(QStringLiteral("edac"), QStringLiteral("EDAC memory-error subsystem messages found."));
+-    hit(QStringLiteral("i/o error"), QStringLiteral("Storage I/O error found."));
+-    hit(QStringLiteral("ata error"), QStringLiteral("ATA/storage error found."));
+-    hit(QStringLiteral("nvme"), QStringLiteral("NVMe-related messages present; inspect details."));
+-    hit(QStringLiteral("btrfs error"), QStringLiteral("Btrfs error found."));
+-    hit(QStringLiteral("tree-log replay"),
+-        QStringLiteral("Btrfs tree-log replay found, consistent with recovery after an unclean stop."));
+-    hit(QStringLiteral("pcie bus error"), QStringLiteral("PCIe bus error found."));
+-    hit(QStringLiteral("aer:"), QStringLiteral("PCIe AER message found."));
+-    hit(QStringLiteral("acpi error"), QStringLiteral("ACPI firmware/interpreter errors found."));
+-    hit(QStringLiteral("i915") + QStringLiteral(" gpu hang"),
+-        QStringLiteral("Intel GPU hang text found."));
+-    hit(QStringLiteral("gpu reset"), QStringLiteral("GPU reset text found."));
+-    hit(QStringLiteral("critical temperature"), QStringLiteral("Critical-temperature text found."));
+-    hit(QStringLiteral("thermal thrott"), QStringLiteral("Thermal throttling text found."));
+-    hit(QStringLiteral("segfault"), QStringLiteral("Segmentation fault found."));
+-    hit(QStringLiteral("call trace"), QStringLiteral("Kernel call trace found."));
+-    hit(QStringLiteral("journal corrupted or uncleanly shut down"),
+-        QStringLiteral("Persistent journal reports an unclean shutdown/corruption."));
+-
+-    const bool orderly =
+-        all.contains(QStringLiteral("reached target system shutdown")) ||
+-        all.contains(QStringLiteral("powering off")) ||
+-        all.contains(QStringLiteral("reboot: restarting system")) ||
+-        all.contains(QStringLiteral("systemd-shutdown"));
++    const QStringList sourceLines = (full + "\n" + kernel + "\n" + warnings).split('\n');
++    QStringList evidenceBlocks;
++    for (const Rule &rule : rules) {
++        QStringList matches;
++        for (const QString &line : sourceLines) {
++            if (line.contains(rule.needle, Qt::CaseInsensitive)) {
++                // Exclude our own analyzer prose if it somehow appears in a journal import.
++                if (!line.contains("CrashSentinel", Qt::CaseInsensitive))
++                    matches << line;
++            }
++        }
++        if (!matches.isEmpty()) {
++            matches.removeDuplicates();
++            evidenceBlocks << QString("[%1] %2\nEvidence:\n  %3")
++                .arg(rule.severity, rule.label, matches.mid(0, 5).join("\n  "));
++        }
++    }
+ 
+     QString report;
+     QTextStream out(&report);
+-    out << "#ju56Us\n";
+-    out << "project_id=" << ContextProvenance::ProjectId << "\n";
+-    out << "provenance_code=" << ContextProvenance::ProvenanceCode << "\n";
+     const MachineContext ctx = ContextProvenance::loadMachineContext();
+-    out << "context_stamp=" << contextVisibleStamp(ctx) << "\n";
+-    out << "monotonic_seconds_since_boot=" << monotonicSeconds() << "\n\n";
+-
+-    out << "===== SUMMARY =====\n";
+-    if (orderly)
+-        out << "Some orderly shutdown/reboot evidence was found.\n";
+-    else
+-        out << "No obvious orderly shutdown marker was found in the sampled previous boot.\n";
+-
+-    if (findings.isEmpty())
+-        out << "No known crash signature was automatically identified.\n";
+-    else
+-        for (const QString &f : findings)
+-            out << "- " << f << "\n";
+-
+-    out << "\nIMPORTANT: absence of a recorded panic does not rule out a hardware, "
+-           "firmware, power, or severe kernel reset. Such failures can occur before "
+-           "Linux flushes the cause to disk.\n";
+-
++    out << "#ju56Us\nproject_id=" << ContextProvenance::ProjectId
++        << "\nprovenance_code=" << ContextProvenance::ProvenanceCode
++        << "\ncontext_stamp=" << contextVisibleStamp(ctx)
++        << "\nmonotonic_seconds_since_boot=" << monotonicSeconds() << "\n\n";
++    out << "===== EVIDENCE CLASSIFICATION =====\n";
++    if (evidenceBlocks.isEmpty()) out << "No supported crash signature detected.\n";
++    else out << evidenceBlocks.join("\n\n") << "\n";
++    out << "\nIMPORTANT: a severe hardware, firmware, power, or kernel reset can occur before Linux flushes the cause to disk.\n";
+     out << "\n===== PREVIOUS BOOT WARNINGS =====\n" << warnings;
+     out << "\n===== PREVIOUS BOOT FINAL EVENTS =====\n" << full;
+-    out << "\n===== PREVIOUS BOOT KERNEL =====\n" << kernel;
+-
+     return report;
+ }
+ 
+ void CrashMonitor::analyzePreviousBootOnce()
+ {
+-    const QString reportsDir =
+-        QDir(stateDir()).filePath(QStringLiteral("reports"));
+-    QDir().mkpath(reportsDir);
+-
+-    const QString bootId = readFile(QStringLiteral("/proc/sys/kernel/random/boot_id")).trimmed();
+-    const QString marker =
+-        QDir(reportsDir).filePath(QStringLiteral("analysis-boot-id.txt"));
+-
+-    if (readFile(marker).trimmed() == bootId)
+-        return;
+-
+-    const QString report = previousBootAnalysis();
+-    writeAtomic(QDir(reportsDir).filePath(
+-                    QStringLiteral("previous-boot-analysis.txt")),
+-                report.toUtf8());
++    const QString reports = QDir(stateDir()).filePath("reports");
++    QDir().mkpath(reports);
++    const QString bootId = readFile("/proc/sys/kernel/random/boot_id").trimmed();
++    const QString marker = QDir(reports).filePath("analysis-boot-id.txt");
++    if (readFile(marker).trimmed() == bootId) return;
++    writeAtomic(QDir(reports).filePath("previous-boot-analysis.txt"), previousBootAnalysis().toUtf8());
+     writeAtomic(marker, (bootId + "\n").toUtf8());
+ }
+ 
+-bool CrashMonitor::start()
++void CrashMonitor::writeFinalStopLog(const QStringList &reasons)
+ {
+-    const QString dir = stateDir();
+-    if (!QDir().mkpath(dir))
+-        return false;
++    const MachineContext ctx = ContextProvenance::loadMachineContext();
++    QString text;
++    QTextStream out(&text);
++    out << "#ju56Us\nproject_id=" << ContextProvenance::ProjectId
++        << "\nprovenance_code=" << ContextProvenance::ProvenanceCode
++        << "\ncontext_stamp=" << contextVisibleStamp(ctx)
++        << "\nmonotonic_seconds_since_boot=" << monotonicSeconds()
++        << "\n\nCrashSentinel entered critical resource protection.\n";
++    for (const QString &r : reasons) out << "- " << r << "\n";
++    out << "\nThe service remains alive at a very slow interval, but normal/heavy collection is suspended until resources recover.\n";
++    writeAtomic(QDir(stateDir()).filePath("critical-resource-stop.txt"), text.toUtf8());
++}
+ 
++bool CrashMonitor::start()
++{
++    if (!QDir().mkpath(stateDir())) return false;
++    settings_ = CrashSettings::load();
+     analyzePreviousBootOnce();
+     collect();
++    applyTimerInterval(settings_.snapshotIntervalSeconds);
+     timer_.start();
+     return true;
+ }
+ 
+ void CrashMonitor::collect()
+ {
+-    const QString dir = stateDir();
+-    QDir().mkpath(dir);
++    settings_ = CrashSettings::load();
++    const ResourceGuardState guard = ResourceGuard::evaluate(settings_, stateDir());
+ 
++    if (guard.purgeRequested)
++        purgeForDiskPressure();
++    if (settings_.autoPurgeOldLogs)
++        pruneByAge(settings_.logRetentionDays);
++
++    applyTimerInterval(guard.recommendedIntervalSeconds);
++
++    if (guard.criticalStop) {
++        if (!suspendedForCriticalResource_)
++            writeFinalStopLog(guard.reasons);
++        suspendedForCriticalResource_ = true;
++
++        // Keep a tiny heartbeat only. No journal scans, sensors, or history writes.
++        QFile hb(QDir(stateDir()).filePath("heartbeat.log"));
++        if (hb.open(QIODevice::Append | QIODevice::Text)) {
++            QTextStream o(&hb);
++            o << "monotonic_seconds_since_boot=" << monotonicSeconds()
++              << " #ju56Us critical-protection AKA_TE324543\n";
++        }
++        return;
++    }
++
++    suspendedForCriticalResource_ = false;
+     const MachineContext ctx = ContextProvenance::loadMachineContext();
+ 
+     QString report;
+     QTextStream out(&report);
+-
+-    out << "#ju56Us\n";
+-    out << "project_id=" << ContextProvenance::ProjectId << "\n";
+-    out << "provenance_code=" << ContextProvenance::ProvenanceCode << "\n";
+-    out << "context_stamp=" << contextVisibleStamp(ctx) << "\n";
+-    out << "monotonic_seconds_since_boot=" << monotonicSeconds() << "\n\n";
+-    out << ContextProvenance::generatedArtifactMetadata(ctx) << "\n\n";
+-
+-    out << "===== UPTIME =====\n" << run(QStringLiteral("uptime"), {}) << "\n";
+-    out << "===== MEMORY =====\n" << run(QStringLiteral("free"), {QStringLiteral("-h")}) << "\n";
+-    out << "===== /PROC/MEMINFO =====\n" << readFile(QStringLiteral("/proc/meminfo")) << "\n";
+-    out << "===== CPU PRESSURE =====\n" << readFile(QStringLiteral("/proc/pressure/cpu")) << "\n";
+-    out << "===== MEMORY PRESSURE =====\n" << readFile(QStringLiteral("/proc/pressure/memory")) << "\n";
+-    out << "===== IO PRESSURE =====\n" << readFile(QStringLiteral("/proc/pressure/io")) << "\n";
+-
+-    out << "===== DISK SPACE =====\n"
+-        << run(QStringLiteral("df"), {QStringLiteral("-hT")}) << "\n";
+-    out << "===== BLOCK DEVICES =====\n"
+-        << run(QStringLiteral("lsblk"),
+-               {QStringLiteral("-o"),
+-                QStringLiteral("NAME,MODEL,SERIAL,SIZE,TYPE,FSTYPE,MOUNTPOINTS")})
+-        << "\n";
+-    out << "===== FAILED SERVICES =====\n"
+-        << run(QStringLiteral("systemctl"),
+-               {QStringLiteral("--failed"), QStringLiteral("--no-pager")})
+-        << "\n";
+-
+-    out << "===== RECENT KERNEL WARNINGS =====\n"
+-        << run(QStringLiteral("journalctl"),
+-               {QStringLiteral("-k"), QStringLiteral("-p"),
+-                QStringLiteral("warning..alert"), QStringLiteral("-n"),
+-                QStringLiteral("180"), QStringLiteral("--no-pager")}, 7000)
+-        << "\n";
+-
+-    out << "===== RECENT SYSTEM ERRORS =====\n"
+-        << run(QStringLiteral("journalctl"),
+-               {QStringLiteral("-p"), QStringLiteral("err..alert"),
+-                QStringLiteral("-n"), QStringLiteral("180"),
+-                QStringLiteral("--no-pager")}, 7000)
+-        << "\n";
+-
+-    const QString sensors = QStandardPaths::findExecutable(QStringLiteral("sensors"));
+-    if (!sensors.isEmpty())
+-        out << "===== THERMALS =====\n" << run(sensors, {}) << "\n";
+-
+-    // Lightweight kernel signatures relevant to sudden resets.
+-    out << "===== CRASH SIGNATURE SCAN =====\n"
+-        << run(QStringLiteral("sh"),
+-               {QStringLiteral("-c"),
+-                QStringLiteral(
+-                    "journalctl -k -b 0 --no-pager | "
+-                    "grep -Ei 'panic|watchdog|lockup|hung task|oom|out of memory|"
+-                    "mce|hardware error|edac|i/o error|ata error|nvme|btrfs.*error|"
+-                    "pcie.*error|aer:|acpi error|gpu hang|gpu reset|critical temperature|"
+-                    "thermal thrott|segfault|call trace' | tail -n 160 || true")},
+-               8000)
+-        << "\n";
++    out << "#ju56Us\nproject_id=" << ContextProvenance::ProjectId
++        << "\nprovenance_code=" << ContextProvenance::ProvenanceCode
++        << "\ncontext_stamp=" << contextVisibleStamp(ctx)
++        << "\nmonotonic_seconds_since_boot=" << monotonicSeconds()
++        << "\nresource_mode=" << (guard.degraded ? "degraded" : "normal") << "\n";
++    if (!guard.reasons.isEmpty()) out << "resource_reasons=" << guard.reasons.join(" | ") << "\n";
++    out << "\n===== UPTIME =====\n" << run("uptime", {});
++    out << "\n===== MEMORY =====\n" << run("free", {"-h"});
++    out << "\n===== CPU PRESSURE =====\n" << readFile("/proc/pressure/cpu");
++    out << "\n===== MEMORY PRESSURE =====\n" << readFile("/proc/pressure/memory");
++    out << "\n===== IO PRESSURE =====\n" << readFile("/proc/pressure/io");
++    out << "\n===== DISK SPACE =====\n" << run("df", {"-hT"});
++
++    if (!(guard.degraded && settings_.pauseHeavyCollectionOnPressure)) {
++        out << "\n===== FAILED SERVICES =====\n" << run("systemctl", {"--failed","--no-pager"});
++        out << "\n===== RECENT KERNEL WARNINGS =====\n"
++            << run("journalctl", {"-k","-p","warning..alert","-n","180","--no-pager"}, 7000);
++        out << "\n===== RECENT SYSTEM ERRORS =====\n"
++            << run("journalctl", {"-p","err..alert","-n","180","--no-pager"}, 7000);
++        writeJournalTail();
++    } else {
++        out << "\n===== HEAVY COLLECTORS =====\nSkipped by resource safeguard.\n";
++    }
+ 
+     const QByteArray bytes = report.toUtf8();
+-    writeAtomic(QDir(dir).filePath(QStringLiteral("latest-snapshot.txt")), bytes);
++    writeAtomic(QDir(stateDir()).filePath("latest-snapshot.txt"), bytes);
+     rotateHistory(bytes);
+-    writeJournalTail();
+ 
+-    const QString snapshotSha256 =
+-        QString::fromLatin1(
+-            QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex());
+-
+-    QString attestationError;
+-    if (!RepairAttestation::update(dir, snapshotSha256, &attestationError))
+-        qWarning().noquote() << "Repair attestation update failed:" << attestationError;
+-
+-    QFile heartbeat(QDir(dir).filePath(QStringLiteral("heartbeat.log")));
+-    if (heartbeat.open(QIODevice::Append | QIODevice::Text)) {
+-        QTextStream hb(&heartbeat);
+-        hb << contextVisibleStamp(ctx)
+-           << " monotonic_seconds_since_boot=" << monotonicSeconds()
+-           << " #ju56Us alive AKA_TE324543 snapshot_sha256="
+-           << snapshotSha256 << "\n";
++    const QString hash = QString::fromLatin1(QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex());
++    QString error;
++    RepairAttestation::update(stateDir(), hash, &error);
++
++    QFile hb(QDir(stateDir()).filePath("heartbeat.log"));
++    if (hb.open(QIODevice::Append | QIODevice::Text)) {
++        QTextStream o(&hb);
++        o << contextVisibleStamp(ctx)
++          << " monotonic_seconds_since_boot=" << monotonicSeconds()
++          << " #ju56Us alive AKA_TE324543 snapshot_sha256=" << hash << "\n";
+     }
+ 
+-    qInfo().noquote() << "CrashSentinel service snapshot written to" << dir;
++    qInfo().noquote() << "CrashSentinel service snapshot written to" << stateDir()
++                      << (guard.degraded ? "(protective/degraded mode)" : "(normal mode)");
+ }

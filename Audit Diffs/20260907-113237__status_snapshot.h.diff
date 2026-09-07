@@ -1,0 +1,31 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: status_snapshot.h
+# generated: 2026-09-07T11:32:37-07:00
+
+--- /dev/null
++++ after/status_snapshot.h
+@@ -0,0 +1,23 @@
++#pragma once
++// #ju56Us
++#include <QString>
++
++struct StatusSnapshot {
++    QString version;
++    QString channel;
++    QString packageType;
++    QString guiUser;
++    QString daemonEvidenceUser;
++    QString serviceState;
++    QString selfProtection;
++    QString crashSummary;
++    QString impactSummary;
++    QString stateDir;
++};
++
++class StatusSnapshotBuilder
++{
++public:
++    static StatusSnapshot build();
++    static QString defaultStateDir();
++};

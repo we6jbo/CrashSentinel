@@ -1,0 +1,201 @@
+// #ju56Us
+// READ ME: system-resource safety policy.
+// The evaluate() function combines user preferences with non-weakenable hard
+// limits. When editing thresholds, preserve the principle that hard limits win.
+
+#include "resource_guard.h"
+
+#include <QDir>
+#include <QFile>
+#include <QStorageInfo>
+#include <QTextStream>
+#include <algorithm>
+
+static double readThermalMilliC(const QString &path)
+{
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly))
+        return -1;
+    bool ok = false;
+    double v = QString::fromUtf8(f.readAll()).trimmed().toDouble(&ok);
+    return ok ? v / 1000.0 : -1;
+}
+
+qint64 ResourceGuard::availableMemoryMiB()
+{
+    QFile f("/proc/meminfo");
+    if (!f.open(QIODevice::ReadOnly))
+        return -1;
+    while (!f.atEnd()) {
+        const QByteArray line = f.readLine();
+        if (line.startsWith("MemAvailable:")) {
+            const auto parts = line.simplified().split(' ');
+            if (parts.size() >= 2)
+                return parts[1].toLongLong() / 1024;
+        }
+    }
+    return -1;
+}
+
+qint64 ResourceGuard::freeDiskMiB(const QString &path)
+{
+    QStorageInfo s(path);
+    return s.isValid() ? qint64(s.bytesAvailable() / (1024 * 1024)) : -1;
+}
+
+int ResourceGuard::diskUsedPercent(const QString &path)
+{
+    QStorageInfo s(path);
+    if (!s.isValid() || s.bytesTotal() == 0)
+        return -1;
+    return int(100.0 * double(s.bytesTotal() - s.bytesAvailable()) / double(s.bytesTotal()));
+}
+
+int ResourceGuard::batteryPercent()
+{
+    QDir p("/sys/class/power_supply");
+    for (const QString &name : p.entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
+        QFile type(p.filePath(name + "/type"));
+        if (!type.open(QIODevice::ReadOnly) || type.readAll().trimmed() != "Battery")
+            continue;
+        QFile cap(p.filePath(name + "/capacity"));
+        if (cap.open(QIODevice::ReadOnly))
+            return QString::fromUtf8(cap.readAll()).trimmed().toInt();
+    }
+    return -1;
+}
+
+bool ResourceGuard::batteryDischarging()
+{
+    QDir p("/sys/class/power_supply");
+    for (const QString &name : p.entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
+        QFile type(p.filePath(name + "/type"));
+        if (!type.open(QIODevice::ReadOnly) || type.readAll().trimmed() != "Battery")
+            continue;
+        QFile st(p.filePath(name + "/status"));
+        if (st.open(QIODevice::ReadOnly))
+            return QString::fromUtf8(st.readAll()).trimmed().compare("Discharging", Qt::CaseInsensitive) == 0;
+    }
+    return false;
+}
+
+double ResourceGuard::maxTemperatureC()
+{
+    QDir d("/sys/class/thermal");
+    double result = -1;
+    for (const QString &name : d.entryList(QStringList() << "thermal_zone*", QDir::Dirs)) {
+        result = std::max(result, readThermalMilliC(d.filePath(name + "/temp")));
+    }
+    return result;
+}
+
+double ResourceGuard::pressureSomeAvg10(const QString &path)
+{
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly))
+        return -1;
+    const QString line = QString::fromUtf8(f.readLine());
+    const int pos = line.indexOf("avg10=");
+    if (pos < 0)
+        return -1;
+    const QString value = line.mid(pos + 6).section(' ', 0, 0);
+    bool ok = false;
+    const double v = value.toDouble(&ok);
+    return ok ? v : -1;
+}
+
+// Human-readable explanation of the non-weakenable safety limits.
+QString ResourceGuard::hardcodedPolicyText()
+{
+    return QStringLiteral(
+        "Non-disableable hardcoded safeguards:\n"
+        "• Disk critical: < 1 GiB free. Final log then stop normal collection.\n"
+        "• Disk protective: < 2 GiB free OR >= 90% used. Purge old CrashSentinel history and slow down.\n"
+        "• Memory critical: < 512 MiB available. Final log then stop normal collection.\n"
+        "• Memory protective: < 1 GiB available. Skip heavy collectors and slow down.\n"
+        "• Battery critical: <= 5% while discharging. Final log then stop normal collection.\n"
+        "• Battery protective: <= 10% while discharging. Slow down and skip heavy collectors.\n"
+        "• Temperature critical: >= 95 C. Final log then stop normal collection.\n"
+        "• Temperature protective: >= 88 C. Slow down and skip heavy collectors.\n"
+        "User settings may be MORE protective than these limits, never less.");
+}
+
+// Combine hard limits and user settings into normal/degraded/critical behavior.
+ResourceGuardState ResourceGuard::evaluate(const CrashSettings &s, const QString &stateDir)
+{
+    ResourceGuardState r;
+    r.recommendedIntervalSeconds = std::max(20, s.snapshotIntervalSeconds);
+
+    const qint64 diskMiB = freeDiskMiB(stateDir);
+    const int usedPct = diskUsedPercent(stateDir);
+    const qint64 memMiB = availableMemoryMiB();
+    const int batt = batteryPercent();
+    const bool discharging = batteryDischarging();
+    const double temp = maxTemperatureC();
+    const double cpuP = pressureSomeAvg10("/proc/pressure/cpu");
+    const double ioP = pressureSomeAvg10("/proc/pressure/io");
+
+    // Hardcoded floors/ceilings cannot be disabled.
+    if (diskMiB >= 0 && diskMiB < 1024) {
+        r.criticalStop = true; r.reasons << "Critical disk free space below 1 GiB.";
+    } else if ((diskMiB >= 0 && diskMiB < 2048) || usedPct >= 90) {
+        r.degraded = true; r.purgeRequested = true; r.reasons << "Protective disk safeguard active.";
+    }
+
+    if (memMiB >= 0 && memMiB < 512) {
+        r.criticalStop = true; r.reasons << "Critical available memory below 512 MiB.";
+    } else if (memMiB >= 0 && memMiB < 1024) {
+        r.degraded = true; r.reasons << "Protective memory safeguard active.";
+    }
+
+    if (discharging && batt >= 0 && batt <= 5) {
+        r.criticalStop = true; r.reasons << "Critical battery safeguard at or below 5%.";
+    } else if (discharging && batt >= 0 && batt <= 10) {
+        r.degraded = true; r.reasons << "Protective low-battery safeguard active.";
+    }
+
+    if (temp >= 95) {
+        r.criticalStop = true; r.reasons << "Critical temperature safeguard at or above 95 C.";
+    } else if (temp >= 88) {
+        r.degraded = true; r.reasons << "Protective temperature safeguard active.";
+    }
+
+    // User thresholds can only make operation more conservative.
+    const qint64 userDiskMiB = qint64(std::max(0, s.minDiskFreeGiB)) * 1024;
+    if ((diskMiB >= 0 && diskMiB < userDiskMiB) ||
+        (usedPct >= 0 && usedPct > std::clamp(s.maxDiskUsedPercent, 1, 99))) {
+        r.degraded = true; r.purgeRequested = s.autoPurgeOldLogs;
+        r.reasons << "User disk reserve threshold reached.";
+    }
+
+    if (memMiB >= 0 && memMiB < std::max<qint64>(1024, s.minMemoryAvailableMiB)) {
+        r.degraded = true; r.reasons << "User memory reserve threshold reached.";
+    }
+
+    if (discharging && batt >= 0 && batt <= std::max(10, s.warningBatteryPercent)) {
+        r.degraded = true; r.reasons << "User battery reserve threshold reached.";
+    }
+
+    if (temp >= 0 && temp >= std::min(88, s.maxTemperatureC)) {
+        r.degraded = true; r.reasons << "User temperature threshold reached.";
+    }
+
+    if (cpuP >= 0 && cpuP > s.maxCpuPressureSomeAvg10) {
+        r.degraded = true; r.reasons << "CPU pressure threshold reached.";
+    }
+    if (ioP >= 0 && ioP > s.maxIoPressureSomeAvg10) {
+        r.degraded = true; r.reasons << "I/O pressure threshold reached.";
+    }
+
+    if (s.gamingProfile && (cpuP > 10 || memMiB < std::max<qint64>(6144, s.minMemoryAvailableMiB))) {
+        r.degraded = true;
+        r.reasons << "Gaming profile preserving CPU/memory headroom.";
+    }
+
+    if (r.degraded)
+        r.recommendedIntervalSeconds = std::max(r.recommendedIntervalSeconds, 60);
+    if (r.criticalStop)
+        r.recommendedIntervalSeconds = 300;
+
+    return r;
+}

@@ -1,0 +1,67 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: main.cpp
+# generated: 2026-09-07T14:52:47-07:00
+
+--- before/main.cpp
++++ after/main.cpp
+@@ -2,6 +2,8 @@
+ #include <QApplication>
+ #include <QCoreApplication>
+ #include <QDebug>
++#include <QDir>
++#include <QLockFile>
+ 
+ #include "mainwindow.h"
+ #include "context_provenance.h"
+@@ -26,6 +28,50 @@
+ 
+         CrashMonitor monitor;
+ 
++        const QString serviceStateDir = monitor.publicStateDir();
++
++        if (!QDir().mkpath(serviceStateDir)) {
++            qCritical()
++                << "CrashSentinel could not create its state directory for "
++                   "single-instance protection:"
++                << serviceStateDir;
++            return 2;
++        }
++
++        QLockFile serviceLock(
++            QDir(serviceStateDir).filePath(
++                QStringLiteral("service-instance.lock")));
++
++        if (!serviceLock.tryLock(0)) {
++            qint64 existingPid = 0;
++            QString existingHost;
++            QString existingApp;
++
++            const bool haveOwner =
++                serviceLock.getLockInfo(
++                    &existingPid,
++                    &existingHost,
++                    &existingApp);
++
++            if (haveOwner) {
++                qCritical().noquote()
++                    << QStringLiteral(
++                           "CrashSentinel monitor is already running "
++                           "(PID %1 on %2, application %3). "
++                           "No second service instance was started.")
++                           .arg(existingPid)
++                           .arg(existingHost)
++                           .arg(existingApp);
++            } else {
++                qCritical()
++                    << "CrashSentinel monitor is already running, or the "
++                       "service lock is currently unavailable. "
++                       "No second service instance was started.";
++            }
++
++            return 3;
++        }
++
+         const SelfProtectionState protection =
+             SelfProtection::noteServiceStart(monitor.publicStateDir());
+ 

@@ -1,0 +1,22 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: status_snapshot.cpp
+# generated: 2026-09-07T15:26:56-07:00
+
+--- before/status_snapshot.cpp
++++ after/status_snapshot.cpp
+@@ -75,8 +75,12 @@
+ 
+     const auto sp = SelfProtection::readState(s.stateDir);
+     s.selfProtection = sp.quarantined
+-        ? "SELF-QUARANTINED: " + sp.reason
+-        : QString("Normal; rapid same-boot failures=%1").arg(sp.rapidFailures);
++        ? QString("SELF-QUARANTINED: %1 | abnormal reboot count=%2")
++              .arg(sp.reason)
++              .arg(sp.abnormalReboots)
++        : QString("Normal; rapid same-boot failures=%1; abnormal reboot count=%2")
++              .arg(sp.rapidFailures)
++              .arg(sp.abnormalReboots);
+ 
+     s.crashSummary = firstSummaryLines(
+         QDir(s.stateDir).filePath("reports/previous-boot-analysis.txt"));

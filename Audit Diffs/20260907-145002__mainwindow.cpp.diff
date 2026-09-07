@@ -1,0 +1,19 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: mainwindow.cpp
+# generated: 2026-09-07T14:50:02-07:00
+
+--- before/mainwindow.cpp
++++ after/mainwindow.cpp
+@@ -59,8 +59,9 @@
+ 
+     scrollDiscoveryHint_ = new QLabel(
+         QStringLiteral(
+-            "<b>More options may be available below.</b> "
+-            "Scroll down to see the rest of a tab."));
++            "<b>You haven't scrolled down in CrashSentinel yet.</b> "
++            "Some tabs have more options below. Scroll down to see them. "
++            "This reminder will disappear permanently after you scroll once."));
+     scrollDiscoveryHint_->setWordWrap(true);
+     scrollDiscoveryHint_->setVisible(false);
+ 

@@ -1,0 +1,16 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: resource_guard.h
+# generated: 2026-09-07T15:40:23-07:00
+
+--- before/resource_guard.h
++++ after/resource_guard.h
+@@ -1,4 +1,8 @@
+ #pragma once
++// READ ME: ResourceGuard decides whether collection stays normal, becomes
++// degraded/slower, or enters critical-stop protection. It protects the machine
++// from the monitor consuming scarce disk, memory, battery, or thermal headroom.
++
+ // #ju56Us
+ 
+ #include "crash_settings.h"

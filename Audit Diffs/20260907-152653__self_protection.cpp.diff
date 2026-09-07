@@ -1,0 +1,221 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: self_protection.cpp
+# generated: 2026-09-07T15:26:53-07:00
+
+--- before/self_protection.cpp
++++ after/self_protection.cpp
+@@ -6,6 +6,7 @@
+ #include <QJsonDocument>
+ #include <QJsonObject>
+ #include <QSaveFile>
++#include <QTextStream>
+ 
+ static QJsonObject readObject(const QString &path)
+ {
+@@ -25,6 +26,37 @@
+     return f.commit();
+ }
+ 
++static bool writeDisabledNotice(const QString &stateDir,
++                                int abnormalReboots,
++                                bool hardStop)
++{
++    const QString path = QDir(stateDir).filePath("CRASHSENTINEL-DISABLED.txt");
++    QSaveFile f(path);
++    if (!f.open(QIODevice::WriteOnly | QIODevice::Text))
++        return false;
++
++    QTextStream out(&f);
++    out << "#ju56Us\n";
++    out << "CrashSentinel automatic reboot safeguard\n\n";
++    out << "CrashSentinel monitoring has been disabled because the computer appears to have rebooted abnormally while CrashSentinel monitoring was active.\n\n";
++    out << "Observed abnormal reboot count: " << abnormalReboots << "\n\n";
++
++    if (hardStop) {
++        out << "HARD SAFETY STOP: the count reached 20. CrashSentinel will not automatically resume monitoring. Twenty abnormal reboots is too many to continue automatically even though this does NOT prove CrashSentinel caused the crashes.\n\n";
++    } else {
++        out << "PRECAUTIONARY STOP: the count reached at least 5. CrashSentinel may or may not be related to the crashes, so monitoring was stopped as a safety precaution.\n\n";
++    }
++
++    out << "To re-enable monitoring deliberately:\n";
++    out << "1. Open CrashSentinel -> Recovery & Diagnostics.\n";
++    out << "2. Create a backup before repair.\n";
++    out << "3. Choose Clear Self-Quarantine.\n";
++    out << "4. Restart the CrashSentinel monitor/service.\n\n";
++    out << "At the 20-reboot hard stop, use the explicit reboot-safeguard reset before restarting monitoring.\n\n";
++    out << "Do not interpret this safeguard as proof that CrashSentinel caused the reboot. It is intentionally conservative.\n";
++    return f.commit();
++}
++
+ QString SelfProtection::bootId()
+ {
+     QFile f("/proc/sys/kernel/random/boot_id");
+@@ -46,14 +78,23 @@
+     return QDir(stateDir).filePath("self-protection.json");
+ }
+ 
++QString SelfProtection::disabledNoticePath(const QString &stateDir)
++{
++    return QDir(stateDir).filePath("CRASHSENTINEL-DISABLED.txt");
++}
++
++
+ SelfProtectionState SelfProtection::readState(const QString &stateDir)
+ {
+     const QJsonObject o = readObject(statePath(stateDir));
+-    SelfProtectionState s;
+-    s.quarantined = o.value("quarantined").toBool(false);
+-    s.rapidFailures = o.value("rapid_failures").toInt(0);
+-    s.reason = o.value("reason").toString();
+-    return s;
++    SelfProtectionState state;
++    state.quarantined = o.value("quarantined").toBool(false);
++    state.rapidFailures = o.value("rapid_failures").toInt(0);
++    state.abnormalReboots = o.value("abnormal_reboots").toInt(0);
++    state.rebootGuardAcknowledged = o.value("reboot_guard_acknowledged").toBool(false);
++    state.hardRebootStop = o.value("hard_reboot_stop").toBool(false);
++    state.reason = o.value("reason").toString();
++    return state;
+ }
+ 
+ SelfProtectionState SelfProtection::noteServiceStart(const QString &stateDir)
+@@ -65,13 +106,15 @@
+     const QString currentBoot = bootId();
+     const QString priorBoot = o.value("boot_id").toString();
+     const QString priorState = o.value("run_state").toString();
+-    const double priorHeartbeat = o.value("last_heartbeat_uptime").toDouble(-1);
++    const double priorHeartbeat = o.value("last_heartbeat_uptime").toDouble(-1.0);
+     const double now = uptimeSeconds();
++
+     int failures = o.value("rapid_failures").toInt(0);
++    int abnormalReboots = o.value("abnormal_reboots").toInt(0);
++    bool acknowledged = o.value("reboot_guard_acknowledged").toBool(false);
++    bool hardStop = o.value("hard_reboot_stop").toBool(false);
+     bool quarantined = o.value("quarantined").toBool(false);
+ 
+-    // Count only same-boot process failures. A whole-computer reboot is NOT
+-    // blamed on CrashSentinel merely because the service did not shut down.
+     if (!quarantined && priorBoot == currentBoot && priorState == "active" &&
+         priorHeartbeat >= 0 && now >= 0 && now - priorHeartbeat < 180.0) {
+         ++failures;
+@@ -79,28 +122,58 @@
+         failures = 0;
+     }
+ 
++    // A changed boot ID while the previous service state was still active is
++    // counted as an abnormal reboot observed while CrashSentinel was running.
++    // This is correlation, not proof of causation.
++    if (!priorBoot.isEmpty() && priorBoot != "unknown" && currentBoot != "unknown" &&
++        priorBoot != currentBoot && priorState == "active") {
++        ++abnormalReboots;
++    }
++
+     QString reason = o.value("reason").toString();
++
+     if (failures >= 3) {
+         quarantined = true;
+-        reason =
+-            "CrashSentinel restarted abnormally at least three times during "
+-            "the same boot. Heavy monitoring was self-quarantined to avoid a "
+-            "possible crash loop. This does not prove CrashSentinel caused a "
+-            "whole-system crash.";
++        reason = "CrashSentinel restarted abnormally at least three times during the same boot. Heavy monitoring was self-quarantined to avoid a possible crash loop. This does not prove CrashSentinel caused a whole-system crash.";
++    }
++
++    if (abnormalReboots >= 5 && !acknowledged) {
++        quarantined = true;
++        reason = QString("CrashSentinel observed %1 abnormal computer reboots while monitoring was active. Monitoring has been disabled as a precaution because CrashSentinel could be involved, although this does not prove causation. See CRASHSENTINEL-DISABLED.txt.").arg(abnormalReboots);
++    }
++
++    if (abnormalReboots >= 20) {
++        hardStop = true;
++        quarantined = true;
++        acknowledged = false;
++        reason = QString("HARD SAFETY STOP: CrashSentinel observed %1 abnormal computer reboots while monitoring was active. Monitoring will not continue automatically. This still does not prove CrashSentinel caused the crashes. See CRASHSENTINEL-DISABLED.txt.").arg(abnormalReboots);
+     }
+ 
+     o["_audit_tag"] = "#ju56Us";
+-    o["schema"] = 1;
++    o["schema"] = 2;
+     o["boot_id"] = currentBoot;
+     o["run_state"] = quarantined ? "quarantined" : "active";
+     o["start_uptime_seconds"] = now;
+     o["last_heartbeat_uptime"] = now;
+     o["rapid_failures"] = failures;
++    o["abnormal_reboots"] = abnormalReboots;
++    o["reboot_guard_acknowledged"] = acknowledged;
++    o["hard_reboot_stop"] = hardStop;
+     o["quarantined"] = quarantined;
+     o["reason"] = reason;
+     writeObject(path, o);
+ 
+-    return {quarantined, failures, reason};
++    if (quarantined && abnormalReboots >= 5)
++        writeDisabledNotice(stateDir, abnormalReboots, hardStop);
++
++    SelfProtectionState state;
++    state.quarantined = quarantined;
++    state.rapidFailures = failures;
++    state.abnormalReboots = abnormalReboots;
++    state.rebootGuardAcknowledged = acknowledged;
++    state.hardRebootStop = hardStop;
++    state.reason = reason;
++    return state;
+ }
+ 
+ void SelfProtection::noteHeartbeat(const QString &stateDir)
+@@ -131,15 +204,53 @@
+ {
+     const QString path = statePath(stateDir);
+     QJsonObject o = readObject(path);
++    const int abnormalReboots = o.value("abnormal_reboots").toInt(0);
++    const bool hardStop = o.value("hard_reboot_stop").toBool(false);
++
++    if (hardStop) {
++        if (error)
++            *error = "CrashSentinel reached the 20-abnormal-reboot hard safety stop. Use the explicit reboot-safeguard reset before restarting monitoring.";
++        return false;
++    }
++
+     o["_audit_tag"] = "#ju56Us";
++    o["schema"] = 2;
+     o["boot_id"] = bootId();
+     o["run_state"] = "cleared";
+     o["rapid_failures"] = 0;
+     o["quarantined"] = false;
+     o["reason"] = "";
++    if (abnormalReboots >= 5)
++        o["reboot_guard_acknowledged"] = true;
++
+     if (!writeObject(path, o)) {
+         if (error) *error = "Could not write self-protection state.";
+         return false;
+     }
++
++    QFile::remove(disabledNoticePath(stateDir));
++    return true;
++}
++
++
++bool SelfProtection::resetRebootSafeguard(const QString &stateDir, QString *error)
++{
++    const QString path = statePath(stateDir);
++    QJsonObject o = readObject(path);
++    o["_audit_tag"] = "#ju56Us";
++    o["schema"] = 2;
++    o["boot_id"] = bootId();
++    o["run_state"] = "cleared";
++    o["rapid_failures"] = 0;
++    o["abnormal_reboots"] = 0;
++    o["reboot_guard_acknowledged"] = false;
++    o["hard_reboot_stop"] = false;
++    o["quarantined"] = false;
++    o["reason"] = "";
++    if (!writeObject(path, o)) {
++        if (error) *error = "Could not reset the reboot safeguard state.";
++        return false;
++    }
++    QFile::remove(disabledNoticePath(stateDir));
+     return true;
+ }

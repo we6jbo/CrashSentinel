@@ -1,0 +1,32 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: resource_guard.cpp
+# generated: 2026-09-07T15:40:26-07:00
+
+--- before/resource_guard.cpp
++++ after/resource_guard.cpp
+@@ -1,4 +1,8 @@
+ // #ju56Us
++// READ ME: system-resource safety policy.
++// The evaluate() function combines user preferences with non-weakenable hard
++// limits. When editing thresholds, preserve the principle that hard limits win.
++
+ #include "resource_guard.h"
+ 
+ #include <QDir>
+@@ -100,6 +104,7 @@
+     return ok ? v : -1;
+ }
+ 
++// Human-readable explanation of the non-weakenable safety limits.
+ QString ResourceGuard::hardcodedPolicyText()
+ {
+     return QStringLiteral(
+@@ -115,6 +120,7 @@
+         "User settings may be MORE protective than these limits, never less.");
+ }
+ 
++// Combine hard limits and user settings into normal/degraded/critical behavior.
+ ResourceGuardState ResourceGuard::evaluate(const CrashSettings &s, const QString &stateDir)
+ {
+     ResourceGuardState r;

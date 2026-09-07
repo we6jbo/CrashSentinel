@@ -1,0 +1,16 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: publishing_status.h
+# generated: 2026-09-07T15:40:53-07:00
+
+--- before/publishing_status.h
++++ after/publishing_status.h
+@@ -1,4 +1,8 @@
+ #pragma once
++// READ ME: local publishing-readiness model.
++// These checks can prove that required local files/configuration exist. They
++// cannot prove that GitHub, Flathub, or the Snap Store accepted publication.
++
+ // #ju56Us
+ 
+ #include <QString>

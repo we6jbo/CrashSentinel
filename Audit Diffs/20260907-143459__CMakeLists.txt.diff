@@ -1,0 +1,17 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: CMakeLists.txt
+# generated: 2026-09-07T14:34:59-07:00
+
+--- before/CMakeLists.txt
++++ after/CMakeLists.txt
+@@ -44,6 +44,9 @@
+     update_checker.cpp
+     update_checker.h
+ 
++    publishing_status.cpp
++    publishing_status.h
++
+     recovery_diagnostics.cpp
+     recovery_diagnostics.h
+ )

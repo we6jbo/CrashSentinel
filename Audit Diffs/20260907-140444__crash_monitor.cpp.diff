@@ -1,0 +1,15 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: crash_monitor.cpp
+# generated: 2026-09-07T14:04:44-07:00
+
+--- before/crash_monitor.cpp
++++ after/crash_monitor.cpp
+@@ -62,6 +62,7 @@
+ 
+         if (parts.size() >= 2) {
+             bool ok = false;
++
+             const qint64 residentPages =
+                 parts[1].toLongLong(&ok);
+ 

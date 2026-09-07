@@ -1,0 +1,28 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: crash_monitor.cpp
+# generated: 2026-09-07T14:57:25-07:00
+
+--- before/crash_monitor.cpp
++++ after/crash_monitor.cpp
+@@ -4,6 +4,7 @@
+ #include "repair_attestation.h"
+ #include "resource_guard.h"
+ #include "self_protection.h"
++#include "deep_diagnostics.h"
+ #include "version_info.h"
+ 
+ #include <QCryptographicHash>
+@@ -409,6 +410,12 @@
+ 
+     settings_ = CrashSettings::load();
+     analyzePreviousBootOnce();
++    QString deepDiagnosticsError;
++    if (!DeepDiagnostics::writeReports(stateDir(), &deepDiagnosticsError)) {
++        qWarning().noquote()
++            << "CrashSentinel deep diagnostics warning:"
++            << deepDiagnosticsError;
++    }
+     applyTimerInterval(settings_.snapshotIntervalSeconds);
+     collect();
+     timer_.start();

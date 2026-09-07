@@ -1,0 +1,36 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: update_checker.h
+# generated: 2026-09-07T11:32:44-07:00
+
+--- /dev/null
++++ after/update_checker.h
+@@ -0,0 +1,28 @@
++#pragma once
++// #ju56Us
++
++#include <QObject>
++#include <QNetworkAccessManager>
++
++struct UpdateResult {
++    bool checkSucceeded = false;
++    bool updateAvailable = false;
++    QString availableVersion;
++    QString message;
++    QString instructionsUrl;
++};
++
++class UpdateChecker : public QObject
++{
++    Q_OBJECT
++public:
++    explicit UpdateChecker(QObject *parent = nullptr);
++    void check();
++
++signals:
++    void finished(const UpdateResult &result);
++
++private:
++    QNetworkAccessManager network_;
++};
++Q_DECLARE_METATYPE(UpdateResult)

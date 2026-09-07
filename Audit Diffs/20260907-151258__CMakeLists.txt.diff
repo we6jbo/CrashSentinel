@@ -1,0 +1,16 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: CMakeLists.txt
+# generated: 2026-09-07T15:12:58-07:00
+
+--- before/CMakeLists.txt
++++ after/CMakeLists.txt
+@@ -52,6 +52,8 @@
+ 
+     deep_diagnostics.cpp
+     deep_diagnostics.h
++    state_paths.cpp
++    state_paths.h
+ )
+ 
+ target_link_libraries(CrashSentinel PRIVATE

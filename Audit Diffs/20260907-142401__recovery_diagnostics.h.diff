@@ -1,0 +1,42 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: recovery_diagnostics.h
+# generated: 2026-09-07T14:24:01-07:00
+
+--- /dev/null
++++ after/recovery_diagnostics.h
+@@ -0,0 +1,34 @@
++#pragma once
++// #ju56Us
++
++#include <QString>
++#include <QStringList>
++
++struct RecoveryDiagnosticsStatus
++{
++    bool quarantined = false;
++    int rapidFailures = 0;
++    QString quarantineReason;
++
++    bool stateDirWritable = false;
++    bool serviceHealthExists = false;
++    bool previousBootReportExists = false;
++    bool analysisMarkerExists = false;
++
++    int guiLikeInstances = 0;
++    int serviceInstances = 0;
++    QStringList processLines;
++
++    QString summary;
++    QString details;
++};
++
++class RecoveryDiagnostics
++{
++public:
++    static RecoveryDiagnosticsStatus inspect(const QString &stateDir);
++    static bool clearSelfQuarantine(const QString &stateDir, QString *error = nullptr);
++    static bool rebuildDerivedReportMarker(const QString &stateDir, QString *error = nullptr);
++    static QString createBackup(const QString &stateDir, QString *error = nullptr);
++    static QString exportDiagnosticReport(const QString &stateDir, QString *error = nullptr);
++};

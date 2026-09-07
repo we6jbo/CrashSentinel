@@ -1,0 +1,13 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: CMakeLists.txt
+# generated: 2026-09-07T10:00:26-07:00
+
+--- before/CMakeLists.txt
++++ after/CMakeLists.txt
+@@ -25,3 +25,5 @@
+ )
+ 
+ include("${CMAKE_CURRENT_SOURCE_DIR}/audit_diffs.cmake")
++
++include("${CMAKE_CURRENT_SOURCE_DIR}/audit_diffs.cmake")

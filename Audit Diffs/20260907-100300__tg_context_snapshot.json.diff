@@ -1,0 +1,22 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: tg_context_snapshot.json
+# generated: 2026-09-07T10:03:00-07:00
+
+--- /dev/null
++++ after/tg_context_snapshot.json
+@@ -0,0 +1,14 @@
++{
++  "schema": 1,
++  "project_id": "page.j03.crashsentinel",
++  "project_name": "CrashSentinel",
++  "identifiers": [
++    "AKA_TE324543"
++  ],
++  "reference": "User-supplied TG / AKA portable provenance contract",
++  "portable": true,
++  "private_registry_required": false,
++  "scope": "Apply provenance only to artifacts, logs, GUI metadata, and communications created by CrashSentinel itself.",
++  "registry_note": "Normal operation does not require /home/we6jbo/.sstages/tg/tg_registry.db",
++  "_audit_tag": "#ju56Us"
++}

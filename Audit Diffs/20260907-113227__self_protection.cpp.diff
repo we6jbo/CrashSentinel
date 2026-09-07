@@ -1,0 +1,153 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: self_protection.cpp
+# generated: 2026-09-07T11:32:27-07:00
+
+--- /dev/null
++++ after/self_protection.cpp
+@@ -0,0 +1,145 @@
++// #ju56Us
++#include "self_protection.h"
++
++#include <QDir>
++#include <QFile>
++#include <QJsonDocument>
++#include <QJsonObject>
++#include <QSaveFile>
++
++static QJsonObject readObject(const QString &path)
++{
++    QFile f(path);
++    if (!f.open(QIODevice::ReadOnly))
++        return {};
++    const auto d = QJsonDocument::fromJson(f.readAll());
++    return d.isObject() ? d.object() : QJsonObject();
++}
++
++static bool writeObject(const QString &path, const QJsonObject &o)
++{
++    QSaveFile f(path);
++    if (!f.open(QIODevice::WriteOnly))
++        return false;
++    f.write(QJsonDocument(o).toJson(QJsonDocument::Indented));
++    return f.commit();
++}
++
++QString SelfProtection::bootId()
++{
++    QFile f("/proc/sys/kernel/random/boot_id");
++    if (!f.open(QIODevice::ReadOnly))
++        return "unknown";
++    return QString::fromUtf8(f.readAll()).trimmed();
++}
++
++double SelfProtection::uptimeSeconds()
++{
++    QFile f("/proc/uptime");
++    if (!f.open(QIODevice::ReadOnly))
++        return -1;
++    return QString::fromUtf8(f.readLine()).section(' ', 0, 0).toDouble();
++}
++
++QString SelfProtection::statePath(const QString &stateDir)
++{
++    return QDir(stateDir).filePath("self-protection.json");
++}
++
++SelfProtectionState SelfProtection::readState(const QString &stateDir)
++{
++    const QJsonObject o = readObject(statePath(stateDir));
++    SelfProtectionState s;
++    s.quarantined = o.value("quarantined").toBool(false);
++    s.rapidFailures = o.value("rapid_failures").toInt(0);
++    s.reason = o.value("reason").toString();
++    return s;
++}
++
++SelfProtectionState SelfProtection::noteServiceStart(const QString &stateDir)
++{
++    QDir().mkpath(stateDir);
++    const QString path = statePath(stateDir);
++    QJsonObject o = readObject(path);
++
++    const QString currentBoot = bootId();
++    const QString priorBoot = o.value("boot_id").toString();
++    const QString priorState = o.value("run_state").toString();
++    const double priorHeartbeat = o.value("last_heartbeat_uptime").toDouble(-1);
++    const double now = uptimeSeconds();
++    int failures = o.value("rapid_failures").toInt(0);
++    bool quarantined = o.value("quarantined").toBool(false);
++
++    // Count only same-boot process failures. A whole-computer reboot is NOT
++    // blamed on CrashSentinel merely because the service did not shut down.
++    if (!quarantined && priorBoot == currentBoot && priorState == "active" &&
++        priorHeartbeat >= 0 && now >= 0 && now - priorHeartbeat < 180.0) {
++        ++failures;
++    } else if (priorBoot != currentBoot) {
++        failures = 0;
++    }
++
++    QString reason = o.value("reason").toString();
++    if (failures >= 3) {
++        quarantined = true;
++        reason =
++            "CrashSentinel restarted abnormally at least three times during "
++            "the same boot. Heavy monitoring was self-quarantined to avoid a "
++            "possible crash loop. This does not prove CrashSentinel caused a "
++            "whole-system crash.";
++    }
++
++    o["_audit_tag"] = "#ju56Us";
++    o["schema"] = 1;
++    o["boot_id"] = currentBoot;
++    o["run_state"] = quarantined ? "quarantined" : "active";
++    o["start_uptime_seconds"] = now;
++    o["last_heartbeat_uptime"] = now;
++    o["rapid_failures"] = failures;
++    o["quarantined"] = quarantined;
++    o["reason"] = reason;
++    writeObject(path, o);
++
++    return {quarantined, failures, reason};
++}
++
++void SelfProtection::noteHeartbeat(const QString &stateDir)
++{
++    const QString path = statePath(stateDir);
++    QJsonObject o = readObject(path);
++    o["_audit_tag"] = "#ju56Us";
++    o["boot_id"] = bootId();
++    if (!o.value("quarantined").toBool(false))
++        o["run_state"] = "active";
++    o["last_heartbeat_uptime"] = uptimeSeconds();
++    writeObject(path, o);
++}
++
++void SelfProtection::noteCleanExit(const QString &stateDir)
++{
++    const QString path = statePath(stateDir);
++    QJsonObject o = readObject(path);
++    o["_audit_tag"] = "#ju56Us";
++    o["boot_id"] = bootId();
++    o["run_state"] = "clean_exit";
++    o["last_heartbeat_uptime"] = uptimeSeconds();
++    o["rapid_failures"] = 0;
++    writeObject(path, o);
++}
++
++bool SelfProtection::clearQuarantine(const QString &stateDir, QString *error)
++{
++    const QString path = statePath(stateDir);
++    QJsonObject o = readObject(path);
++    o["_audit_tag"] = "#ju56Us";
++    o["boot_id"] = bootId();
++    o["run_state"] = "cleared";
++    o["rapid_failures"] = 0;
++    o["quarantined"] = false;
++    o["reason"] = "";
++    if (!writeObject(path, o)) {
++        if (error) *error = "Could not write self-protection state.";
++        return false;
++    }
++    return true;
++}

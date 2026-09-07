@@ -1,0 +1,131 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: mainwindow.cpp
+# generated: 2026-09-07T15:40:01-07:00
+
+--- before/mainwindow.cpp
++++ after/mainwindow.cpp
+@@ -1,4 +1,11 @@
+ // #ju56Us
++// READ ME: this file builds almost all of the visible CrashSentinel interface.
++// Qt Designer shows only the minimal mainwindow.ui placeholder; the runtime
++// six-tab interface is assembled below with QWidget/QLayout objects.
++// To change a tab, find its build...Tab() function. To change tab order, edit
++// // START HERE FOR THE INTERFACE: creates the six tabs and controls their order.
++MainWindow::MainWindow().
++
+ #include "mainwindow.h"
+ 
+ #include "crash_settings.h"
+@@ -113,6 +120,7 @@
+     refreshStatus();
+ }
+ 
++// Wrap every tab in a scroll area so smaller screens can reach all controls.
+ QWidget *MainWindow::makeScrollable(QWidget *content)
+ {
+     auto *scroll = new QScrollArea;
+@@ -130,6 +138,7 @@
+     return scroll;
+ }
+ 
++// TAB 1: Install & Publish. Local readiness checks only.
+ QWidget *MainWindow::buildPublishingTab()
+ {
+     auto *w = new QWidget;
+@@ -186,6 +195,7 @@
+     return w;
+ }
+ 
++// TAB 2: Status. Current package/service/resource/evidence summary.
+ QWidget *MainWindow::buildStatusTab()
+ {
+     auto *w = new QWidget;
+@@ -251,6 +261,7 @@
+     return w;
+ }
+ 
++// TAB 3: Safeguards. User preferences plus non-weakenable hard limits.
+ QWidget *MainWindow::buildSafeguardsTab()
+ {
+     auto *w = new QWidget;
+@@ -340,6 +351,7 @@
+     return w;
+ }
+ 
++// TAB 4: Profiles. Convenience presets, not hardware-equivalence claims.
+ QWidget *MainWindow::buildProfilesTab()
+ {
+     auto *w = new QWidget;
+@@ -379,6 +391,7 @@
+     return w;
+ }
+ 
++// TAB 6: Recovery & Diagnostics. Lightweight recovery even during quarantine.
+ QWidget *MainWindow::buildRecoveryDiagnosticsTab()
+ {
+     auto *w = new QWidget;
+@@ -449,6 +462,7 @@
+     return w;
+ }
+ 
++// TAB 5: Reports. Shows the stored previous-boot analysis.
+ QWidget *MainWindow::buildReportsTab()
+ {
+     auto *w = new QWidget;
+@@ -470,6 +484,7 @@
+     return w;
+ }
+ 
++// Copy persisted settings into the visible controls.
+ void MainWindow::loadSettingsIntoUi()
+ {
+     const CrashSettings s = CrashSettings::load();
+@@ -490,6 +505,7 @@
+     autoPurge_->setChecked(s.autoPurgeOldLogs);
+ }
+ 
++// Copy visible controls back to persistent settings, then refresh status.
+ void MainWindow::saveSettings()
+ {
+     CrashSettings s;
+@@ -555,6 +571,7 @@
+     autoPurge_->setChecked(true);
+ }
+ 
++// Build the plain-language status/details text shown to the user.
+ QString MainWindow::statusText() const
+ {
+     const StatusSnapshot status =
+@@ -595,6 +612,7 @@
+     return text;
+ }
+ 
++// Re-read current state and repaint status/report widgets.
+ void MainWindow::refreshStatus()
+ {
+     const CrashSettings settings = CrashSettings::load();
+@@ -683,6 +701,7 @@
+             QUrl(updateInstructionsUrl_));
+ }
+ 
++// User-requested normal quarantine clear. A 20-reboot hard stop must still refuse.
+ void MainWindow::clearQuarantine()
+ {
+     const QString stateDir =
+@@ -800,6 +819,7 @@
+ }
+ 
+ 
++// Re-run LOCAL publishing prerequisites; external publication is verified elsewhere.
+ void MainWindow::verifyPublishingSetup()
+ {
+     QString root =
+@@ -886,6 +906,7 @@
+     verifyPublishingSetup();
+ }
+ 
++// Once a real scroll happens, permanently retire the discovery reminder.
+ void MainWindow::noteScrollDiscovered()
+ {
+     if (scrollDiscovered_)

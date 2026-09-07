@@ -1,0 +1,385 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: recovery_diagnostics.cpp
+# generated: 2026-09-07T14:23:58-07:00
+
+--- /dev/null
++++ after/recovery_diagnostics.cpp
+@@ -0,0 +1,377 @@
++// #ju56Us
++#include "recovery_diagnostics.h"
++
++#include <QDir>
++#include <QFile>
++#include <QFileInfo>
++#include <QJsonDocument>
++#include <QJsonObject>
++#include <QProcess>
++#include <QSaveFile>
++#include <QStandardPaths>
++#include <QTextStream>
++
++static QString readTextFile(const QString &path)
++{
++    QFile f(path);
++    if (!f.open(QIODevice::ReadOnly))
++        return {};
++    return QString::fromUtf8(f.readAll());
++}
++
++static bool writeJsonObject(const QString &path,
++                            const QJsonObject &object,
++                            QString *error)
++{
++    QSaveFile f(path);
++
++    if (!f.open(QIODevice::WriteOnly)) {
++        if (error)
++            *error = f.errorString();
++        return false;
++    }
++
++    f.write(QJsonDocument(object).toJson(QJsonDocument::Indented));
++
++    if (!f.commit()) {
++        if (error)
++            *error = QStringLiteral("Could not commit updated state file.");
++        return false;
++    }
++
++    return true;
++}
++
++static QStringList crashSentinelProcessLines()
++{
++    QProcess p;
++    p.start(QStringLiteral("pgrep"),
++            {QStringLiteral("-af"), QStringLiteral("CrashSentinel")});
++
++    if (!p.waitForStarted(1000))
++        return {};
++
++    if (!p.waitForFinished(2500)) {
++        p.kill();
++        p.waitForFinished(500);
++        return {};
++    }
++
++    const QString output =
++        QString::fromUtf8(p.readAllStandardOutput()).trimmed();
++
++    if (output.isEmpty())
++        return {};
++
++    return output.split('\n', Qt::SkipEmptyParts);
++}
++
++RecoveryDiagnosticsStatus RecoveryDiagnostics::inspect(const QString &stateDir)
++{
++    RecoveryDiagnosticsStatus s;
++
++    const QString protectionPath =
++        QDir(stateDir).filePath(QStringLiteral("self-protection.json"));
++    const QString healthPath =
++        QDir(stateDir).filePath(QStringLiteral("service-health.json"));
++    const QString reportPath =
++        QDir(stateDir).filePath(
++            QStringLiteral("reports/previous-boot-analysis.txt"));
++    const QString markerPath =
++        QDir(stateDir).filePath(
++            QStringLiteral("reports/analysis-boot-id.txt"));
++
++    QFile pf(protectionPath);
++    if (pf.open(QIODevice::ReadOnly)) {
++        const QJsonDocument doc =
++            QJsonDocument::fromJson(pf.readAll());
++
++        if (doc.isObject()) {
++            const QJsonObject o = doc.object();
++            s.quarantined =
++                o.value(QStringLiteral("quarantined")).toBool(false);
++            s.rapidFailures =
++                o.value(QStringLiteral("rapid_failures")).toInt(0);
++            s.quarantineReason =
++                o.value(QStringLiteral("reason")).toString();
++        }
++    }
++
++    s.serviceHealthExists = QFileInfo::exists(healthPath);
++    s.previousBootReportExists = QFileInfo::exists(reportPath);
++    s.analysisMarkerExists = QFileInfo::exists(markerPath);
++
++    QDir dir(stateDir);
++    if (!dir.exists())
++        QDir().mkpath(stateDir);
++
++    const QString probe =
++        dir.filePath(QStringLiteral(".recovery-write-probe"));
++
++    QFile probeFile(probe);
++    if (probeFile.open(QIODevice::WriteOnly)) {
++        probeFile.write("ok\n");
++        probeFile.close();
++        QFile::remove(probe);
++        s.stateDirWritable = true;
++    }
++
++    s.processLines = crashSentinelProcessLines();
++
++    for (const QString &line : s.processLines) {
++        if (line.contains(QStringLiteral("--service")))
++            ++s.serviceInstances;
++        else if (line.contains(QStringLiteral("/CrashSentinel")))
++            ++s.guiLikeInstances;
++    }
++
++    QStringList summaryParts;
++
++    if (s.quarantined)
++        summaryParts << QStringLiteral("Monitoring is self-quarantined.");
++
++    if (s.serviceInstances > 1)
++        summaryParts << QStringLiteral(
++            "Multiple service instances were detected.");
++
++    if (!s.stateDirWritable)
++        summaryParts << QStringLiteral(
++            "CrashSentinel state directory is not writable.");
++
++    if (!s.serviceHealthExists)
++        summaryParts << QStringLiteral(
++            "Service health file is missing.");
++
++    if (summaryParts.isEmpty())
++        s.summary = QStringLiteral(
++            "No unusual CrashSentinel recovery condition is currently detected.");
++    else
++        s.summary = summaryParts.join(QStringLiteral(" "));
++
++    QStringList d;
++    d << QStringLiteral("CrashSentinel Recovery & Diagnostics");
++    d << QStringLiteral("#ju56Us");
++    d << QString();
++    d << QStringLiteral("State directory: %1").arg(stateDir);
++    d << QStringLiteral("Writable: %1")
++             .arg(s.stateDirWritable ? "YES" : "NO");
++    d << QStringLiteral("Self-quarantined: %1")
++             .arg(s.quarantined ? "YES" : "NO");
++    d << QStringLiteral("Rapid same-boot failures: %1")
++             .arg(s.rapidFailures);
++
++    if (!s.quarantineReason.isEmpty())
++        d << QStringLiteral("Quarantine reason: %1")
++                 .arg(s.quarantineReason);
++
++    d << QStringLiteral("Service instances: %1")
++             .arg(s.serviceInstances);
++    d << QStringLiteral("Other CrashSentinel executable instances: %1")
++             .arg(s.guiLikeInstances);
++    d << QStringLiteral("service-health.json: %1")
++             .arg(s.serviceHealthExists ? "PRESENT" : "MISSING");
++    d << QStringLiteral("Previous-boot report: %1")
++             .arg(s.previousBootReportExists ? "PRESENT" : "MISSING");
++    d << QStringLiteral("Analysis marker: %1")
++             .arg(s.analysisMarkerExists ? "PRESENT" : "MISSING");
++
++    if (!s.processLines.isEmpty()) {
++        d << QString();
++        d << QStringLiteral("Detected processes:");
++        for (const QString &line : s.processLines)
++            d << QStringLiteral("  %1").arg(line);
++    }
++
++    d << QString();
++    d << QStringLiteral(
++        "Recovery actions only modify CrashSentinel's own state. "
++        "They do not claim to repair Linux, firmware, hardware, "
++        "or unrelated applications.");
++
++    s.details = d.join(QStringLiteral("\n"));
++    return s;
++}
++
++bool RecoveryDiagnostics::clearSelfQuarantine(const QString &stateDir,
++                                              QString *error)
++{
++    const QString path =
++        QDir(stateDir).filePath(QStringLiteral("self-protection.json"));
++
++    QFile f(path);
++    if (!f.open(QIODevice::ReadOnly)) {
++        if (error)
++            *error = QStringLiteral(
++                "self-protection.json could not be opened.");
++        return false;
++    }
++
++    const QJsonDocument doc = QJsonDocument::fromJson(f.readAll());
++    if (!doc.isObject()) {
++        if (error)
++            *error = QStringLiteral(
++                "self-protection.json is not valid JSON.");
++        return false;
++    }
++
++    QJsonObject o = doc.object();
++    o.insert(QStringLiteral("_audit_tag"), QStringLiteral("#ju56Us"));
++    o.insert(QStringLiteral("quarantined"), false);
++    o.insert(QStringLiteral("rapid_failures"), 0);
++    o.insert(QStringLiteral("reason"), QString());
++    o.insert(QStringLiteral("run_state"),
++             QStringLiteral("cleared-by-recovery-ui"));
++
++    return writeJsonObject(path, o, error);
++}
++
++bool RecoveryDiagnostics::rebuildDerivedReportMarker(
++    const QString &stateDir,
++    QString *error)
++{
++    const QString marker =
++        QDir(stateDir).filePath(
++            QStringLiteral("reports/analysis-boot-id.txt"));
++
++    if (!QFileInfo::exists(marker))
++        return true;
++
++    if (!QFile::remove(marker)) {
++        if (error)
++            *error = QStringLiteral(
++                "Could not remove the previous-boot analysis marker.");
++        return false;
++    }
++
++    return true;
++}
++
++QString RecoveryDiagnostics::createBackup(const QString &stateDir,
++                                          QString *error)
++{
++    QString base =
++        QStandardPaths::writableLocation(
++            QStandardPaths::DocumentsLocation);
++
++    if (base.isEmpty())
++        base = QDir::homePath();
++
++    const QString backupDir =
++        QDir(base).filePath(
++            QStringLiteral("CrashSentinel-Recovery-Backup"));
++
++    if (!QDir().mkpath(backupDir)) {
++        if (error)
++            *error = QStringLiteral(
++                "Could not create backup directory.");
++        return {};
++    }
++
++    const QStringList files = {
++        QStringLiteral("self-protection.json"),
++        QStringLiteral("service-health.json"),
++        QStringLiteral("repair-readiness.json"),
++        QStringLiteral("latest-snapshot.txt"),
++        QStringLiteral("reports/previous-boot-analysis.txt"),
++        QStringLiteral("reports/analysis-boot-id.txt")
++    };
++
++    QStringList manifest;
++    manifest << QStringLiteral("#ju56Us");
++    manifest << QStringLiteral("CrashSentinel recovery backup");
++    manifest << QStringLiteral("Source state directory: %1")
++                    .arg(stateDir);
++
++    for (const QString &relative : files) {
++        const QString src = QDir(stateDir).filePath(relative);
++
++        if (!QFileInfo::exists(src)) {
++            manifest << QStringLiteral("MISSING: %1").arg(relative);
++            continue;
++        }
++
++        QString safeName = relative;
++        safeName.replace('/', QStringLiteral("__"));
++
++        const QString dst =
++            QDir(backupDir).filePath(safeName);
++
++        QFile::remove(dst);
++
++        if (QFile::copy(src, dst))
++            manifest << QStringLiteral("COPIED: %1").arg(relative);
++        else
++            manifest << QStringLiteral("FAILED: %1").arg(relative);
++    }
++
++    QFile mf(
++        QDir(backupDir).filePath(
++            QStringLiteral("backup-manifest.txt")));
++
++    if (mf.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
++        QTextStream ts(&mf);
++        ts << manifest.join(QStringLiteral("\n")) << '\n';
++    }
++
++    return backupDir;
++}
++
++QString RecoveryDiagnostics::exportDiagnosticReport(
++    const QString &stateDir,
++    QString *error)
++{
++    QString base =
++        QStandardPaths::writableLocation(
++            QStandardPaths::DocumentsLocation);
++
++    if (base.isEmpty())
++        base = QDir::homePath();
++
++    const QString output =
++        QDir(base).filePath(
++            QStringLiteral("CrashSentinel-Diagnostic-Report.txt"));
++
++    QSaveFile f(output);
++
++    if (!f.open(QIODevice::WriteOnly)) {
++        if (error)
++            *error = f.errorString();
++        return {};
++    }
++
++    QTextStream ts(&f);
++    const auto status = inspect(stateDir);
++
++    ts << "#ju56Us\n";
++    ts << "CrashSentinel Diagnostic Report\n\n";
++    ts << status.details << "\n\n";
++
++    const QStringList files = {
++        QStringLiteral("service-health.json"),
++        QStringLiteral("self-protection.json"),
++        QStringLiteral("repair-readiness.json"),
++        QStringLiteral("reports/previous-boot-analysis.txt")
++    };
++
++    for (const QString &relative : files) {
++        ts << "===== " << relative << " =====\n";
++        const QString content =
++            readTextFile(QDir(stateDir).filePath(relative));
++
++        if (content.isEmpty())
++            ts << "[missing or empty]\n";
++        else
++            ts << content << '\n';
++
++        ts << '\n';
++    }
++
++    if (!f.commit()) {
++        if (error)
++            *error = QStringLiteral(
++                "Could not commit diagnostic report.");
++        return {};
++    }
++
++    return output;
++}
