@@ -9,6 +9,18 @@
 #include "context_provenance.h"
 #include "crash_monitor.h"
 #include "self_protection.h"
+#include "state_paths.h"
+
+static bool argumentRequested(int argc,
+                              char *argv[],
+                              const QString &wanted)
+{
+    for (int i = 1; i < argc; ++i) {
+        if (QString::fromLocal8Bit(argv[i]) == wanted)
+            return true;
+    }
+    return false;
+}
 
 static bool serviceRequested(int argc, char *argv[])
 {
@@ -21,6 +33,45 @@ static bool serviceRequested(int argc, char *argv[])
 
 int main(int argc, char *argv[])
 {
+
+    const bool clearQuarantineRequested =
+        argumentRequested(argc, argv, QStringLiteral("--clear-quarantine"));
+    const bool resetRebootSafeguardRequested =
+        argumentRequested(argc, argv,
+                          QStringLiteral("--reset-reboot-safeguard"));
+
+    if (clearQuarantineRequested || resetRebootSafeguardRequested) {
+        QCoreApplication app(argc, argv);
+        QCoreApplication::setApplicationName(QStringLiteral("CrashSentinel"));
+        QCoreApplication::setOrganizationName(QStringLiteral("j03.page"));
+
+        const QString stateDir = StatePaths::sharedStateDir();
+        QString error;
+        bool ok = false;
+
+        if (resetRebootSafeguardRequested) {
+            ok = SelfProtection::resetRebootSafeguard(stateDir, &error);
+            if (ok)
+                qInfo().noquote()
+                    << "CrashSentinel reboot safeguard was explicitly reset. "
+                       "The abnormal reboot counter is now zero.";
+        } else {
+            ok = SelfProtection::clearQuarantine(stateDir, &error);
+            if (ok)
+                qInfo().noquote()
+                    << "CrashSentinel quarantine was explicitly cleared. "
+                       "If the five-reboot precautionary stop had been reached, "
+                       "the abnormal reboot counter is preserved.";
+        }
+
+        if (!ok) {
+            qCritical().noquote() << error;
+            return 4;
+        }
+
+        return 0;
+    }
+
     if (serviceRequested(argc, argv)) {
         QCoreApplication app(argc, argv);
         QCoreApplication::setApplicationName(QStringLiteral("CrashSentinel"));
