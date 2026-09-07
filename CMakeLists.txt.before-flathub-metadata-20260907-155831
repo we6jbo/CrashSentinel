@@ -73,11 +73,3 @@ install(TARGETS CrashSentinel
 )
 
 include("${CMAKE_CURRENT_SOURCE_DIR}/audit_diffs.cmake")
-
-# Flathub desktop integration
-install(FILES org.oneal.CrashSentinel.desktop
-        DESTINATION share/applications)
-install(FILES org.oneal.CrashSentinel.metainfo.xml
-        DESTINATION share/metainfo)
-install(FILES org.oneal.CrashSentinel.svg
-        DESTINATION share/icons/hicolor/scalable/apps)
