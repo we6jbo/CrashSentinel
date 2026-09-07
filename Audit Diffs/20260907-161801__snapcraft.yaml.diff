@@ -1,0 +1,25 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: snapcraft.yaml
+# generated: 2026-09-07T16:18:01-07:00
+
+--- before/snapcraft.yaml
++++ after/snapcraft.yaml
+@@ -18,7 +18,7 @@
+ 
+ apps:
+   crashsentinel:
+-    command: usr/bin/CrashSentinel
++    command: usr/local/bin/CrashSentinel
+     extensions:
+       - kde-neon-6
+     plugs:
+@@ -31,7 +31,7 @@
+       - network-status
+ 
+   monitor:
+-    command: usr/bin/CrashSentinel --service
++    command: usr/local/bin/CrashSentinel --service
+     daemon: simple
+     daemon-scope: system
+     install-mode: enable

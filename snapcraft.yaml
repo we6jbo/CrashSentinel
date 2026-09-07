@@ -18,7 +18,7 @@ confinement: strict
 
 apps:
   crashsentinel:
-    command: usr/bin/CrashSentinel
+    command: usr/local/bin/CrashSentinel
     extensions:
       - kde-neon-6
     plugs:
@@ -31,7 +31,7 @@ apps:
       - network-status
 
   monitor:
-    command: usr/bin/CrashSentinel --service
+    command: usr/local/bin/CrashSentinel --service
     daemon: simple
     daemon-scope: system
     install-mode: enable
