@@ -1,4 +1,9 @@
 # #ju56Us
+# READ ME: CMake tells Qt Creator how CrashSentinel is built.
+# The qt_add_executable() list is the project source list. Qt's AUTOMOC/AUTOUIC/
+# AUTORCC support is enabled above it. The executable links Qt Widgets for the
+# GUI and Qt Network for the update checker. START-HERE.md is documentation only.
+
 cmake_minimum_required(VERSION 3.21)
 
 project(CrashSentinel VERSION 0.1 LANGUAGES CXX)
@@ -12,6 +17,8 @@ set(CMAKE_AUTORCC ON)
 find_package(Qt6 REQUIRED COMPONENTS Widgets Network)
 
 qt_add_executable(CrashSentinel
+    # Documentation-only project map shown in Qt Creator.
+    START-HERE.md
     main.cpp
     mainwindow.cpp
     mainwindow.h

@@ -1,4 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  #ju56Us
+  READ ME:
+  This .ui file is intentionally only a minimal Qt Designer placeholder.
+  CrashSentinel's real six-tab runtime interface is created in mainwindow.cpp.
+  Edit the build...Tab() functions there to modify the visible application.
+  Keeping this note here prevents the Design view from being mistaken for the
+  complete runtime interface.
+ -->
 <ui version="4.0">
  <class>MainWindow</class>
  <widget class="QMainWindow" name="MainWindow">

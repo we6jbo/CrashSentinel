@@ -1,4 +1,12 @@
 // #ju56Us
+// READ ME: this is CrashSentinel's process entry point.
+// There are three paths through main():
+//   1) recovery command-line actions,
+//   2) --service background monitor mode,
+//   3) the normal Qt Widgets GUI.
+// Service self-protection is checked BEFORE CrashMonitor::start(), so a
+// quarantine or reboot hard-stop prevents heavy monitoring from beginning.
+
 #include <QApplication>
 #include <QCoreApplication>
 #include <QDebug>
@@ -11,6 +19,7 @@
 #include "self_protection.h"
 #include "state_paths.h"
 
+// Helper used by the explicit recovery command-line switches.
 static bool argumentRequested(int argc,
                               char *argv[],
                               const QString &wanted)
@@ -22,6 +31,7 @@ static bool argumentRequested(int argc,
     return false;
 }
 
+// Detect --service without constructing the GUI application first.
 static bool serviceRequested(int argc, char *argv[])
 {
     for (int i = 1; i < argc; ++i) {
@@ -31,6 +41,7 @@ static bool serviceRequested(int argc, char *argv[])
     return false;
 }
 
+// START HERE: process mode selection and service startup safety checks.
 int main(int argc, char *argv[])
 {
 
@@ -89,6 +100,7 @@ int main(int argc, char *argv[])
             return 2;
         }
 
+        // Defense in depth: never allow two monitor instances to collect/write at once.
         QLockFile serviceLock(
             QDir(serviceStateDir).filePath(
                 QStringLiteral("service-instance.lock")));
@@ -123,6 +135,7 @@ int main(int argc, char *argv[])
             return 3;
         }
 
+        // IMPORTANT: quarantine/reboot guard is evaluated before heavy monitoring starts.
         const SelfProtectionState protection =
             SelfProtection::noteServiceStart(monitor.publicStateDir());
 

@@ -1,4 +1,9 @@
 #pragma once
+// READ ME: MainWindow declares the runtime GUI built in mainwindow.cpp.
+// Most widgets are created in C++, not in mainwindow.ui. The build*Tab()
+// functions correspond to the six visible tabs. Widget pointers kept here are
+// the controls that other methods need to update after construction.
+
 // #ju56Us
 
 #include <QMainWindow>
