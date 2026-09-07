@@ -43,6 +43,17 @@ qt_add_executable(CrashSentinel
 
     update_checker.cpp
     update_checker.h
+
+    publishing_status.cpp
+    publishing_status.h
+
+    recovery_diagnostics.cpp
+    recovery_diagnostics.h
+
+    deep_diagnostics.cpp
+    deep_diagnostics.h
+    state_paths.cpp
+    state_paths.h
 )
 
 target_link_libraries(CrashSentinel PRIVATE

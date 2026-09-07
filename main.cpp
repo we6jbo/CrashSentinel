@@ -2,10 +2,13 @@
 #include <QApplication>
 #include <QCoreApplication>
 #include <QDebug>
+#include <QDir>
+#include <QLockFile>
 
 #include "mainwindow.h"
 #include "context_provenance.h"
 #include "crash_monitor.h"
+#include "self_protection.h"
 
 static bool serviceRequested(int argc, char *argv[])
 {
@@ -24,6 +27,65 @@ int main(int argc, char *argv[])
         QCoreApplication::setOrganizationName(QStringLiteral("j03.page"));
 
         CrashMonitor monitor;
+
+        const QString serviceStateDir = monitor.publicStateDir();
+
+        if (!QDir().mkpath(serviceStateDir)) {
+            qCritical()
+                << "CrashSentinel could not create its state directory for "
+                   "single-instance protection:"
+                << serviceStateDir;
+            return 2;
+        }
+
+        QLockFile serviceLock(
+            QDir(serviceStateDir).filePath(
+                QStringLiteral("service-instance.lock")));
+
+        if (!serviceLock.tryLock(0)) {
+            qint64 existingPid = 0;
+            QString existingHost;
+            QString existingApp;
+
+            const bool haveOwner =
+                serviceLock.getLockInfo(
+                    &existingPid,
+                    &existingHost,
+                    &existingApp);
+
+            if (haveOwner) {
+                qCritical().noquote()
+                    << QStringLiteral(
+                           "CrashSentinel monitor is already running "
+                           "(PID %1 on %2, application %3). "
+                           "No second service instance was started.")
+                           .arg(existingPid)
+                           .arg(existingHost)
+                           .arg(existingApp);
+            } else {
+                qCritical()
+                    << "CrashSentinel monitor is already running, or the "
+                       "service lock is currently unavailable. "
+                       "No second service instance was started.";
+            }
+
+            return 3;
+        }
+
+        const SelfProtectionState protection =
+            SelfProtection::noteServiceStart(monitor.publicStateDir());
+
+        if (protection.quarantined) {
+            qCritical().noquote()
+                << "CrashSentinel is self-quarantined:"
+                << protection.reason;
+            return 0;
+        }
+
+        QObject::connect(&app, &QCoreApplication::aboutToQuit, [&monitor] {
+            SelfProtection::noteCleanExit(monitor.publicStateDir());
+        });
+
         if (!monitor.start()) {
             qCritical() << "CrashSentinel service could not initialize its state directory.";
             return 2;
@@ -34,6 +96,8 @@ int main(int argc, char *argv[])
     }
 
     QApplication app(argc, argv);
+    QCoreApplication::setApplicationName(QStringLiteral("CrashSentinel"));
+    QCoreApplication::setOrganizationName(QStringLiteral("j03.page"));
 
     const QString projectRoot = QCoreApplication::applicationDirPath();
 
