@@ -61,6 +61,8 @@ qt_add_executable(CrashSentinel
     deep_diagnostics.h
     state_paths.cpp
     state_paths.h
+    README.md
+    phase58791.txt
 )
 
 target_link_libraries(CrashSentinel PRIVATE
