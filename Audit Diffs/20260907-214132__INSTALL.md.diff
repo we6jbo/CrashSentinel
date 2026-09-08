@@ -1,0 +1,68 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: INSTALL.md
+# generated: 2026-09-07T21:41:32-07:00
+
+--- /dev/null
++++ after/INSTALL.md
+@@ -0,0 +1,60 @@
++# Installing CrashSentinel
++
++<!-- #ju56Us -->
++
++CrashSentinel is a Qt/C++ Linux crash-monitoring and recovery-analysis project.
++
++## Flatpak / Flathub
++
++When the public Flathub listing is available:
++
++```bash
++flatpak install flathub org.oneal.CrashSentinel
++flatpak run org.oneal.CrashSentinel
++```
++
++The Flatpak package is primarily the GUI/report-viewer distribution. A sandboxed
++Flatpak should not be assumed to provide unrestricted host-level monitoring.
++
++## Snap
++
++When a stable Snap Store release is publicly available:
++
++```bash
++sudo snap install crashsentinel
++```
++
++A locally built Snap can be installed for testing with:
++
++```bash
++sudo snap install ./crashsentinel_0.1.0_amd64.snap --dangerous
++```
++
++The Snap packaging includes the GUI and the system-monitor service. Store
++availability can be checked with:
++
++```bash
++snap info crashsentinel
++```
++
++## Build from source
++
++The project requires CMake and Qt 6 components Widgets and Network.
++
++```bash
++cmake -S . -B build
++cmake --build build -j2
++```
++
++The exact executable location depends on the selected CMake generator/build
++directory.
++
++## Source
++
++Public source repository:
++
++https://github.com/we6jbo/CrashSentinel
++
++Project notes and updates:
++
++https://j03.page/2026/09/07/crash-sentinel/

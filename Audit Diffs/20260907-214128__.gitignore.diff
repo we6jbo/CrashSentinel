@@ -1,0 +1,15 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: .gitignore
+# generated: 2026-09-07T21:41:28-07:00
+
+--- before/.gitignore
++++ after/.gitignore
+@@ -7,3 +7,7 @@
+ *.o
+ *.user
+ .audit-state/
++.flatpak-builder/
++build*/
++flathub-submission/
++*.before-*

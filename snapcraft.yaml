@@ -32,6 +32,8 @@ apps:
 
   monitor:
     command: usr/local/bin/CrashSentinel --service
+    extensions:
+      - kde-neon-6
     daemon: simple
     daemon-scope: system
     install-mode: enable
@@ -61,3 +63,10 @@ parts:
 # Direct SMART access to raw block devices may require an interface or
 # confinement choice that receives additional Snap Store review.
 # Do not broaden device access merely to make SMART output appear.
+title: 'CrashSentinel'
+license: 'Apache-2.0'
+contact: 'mailto:joneal97m@gmail.com'
+website: 'https://j03.page/utils/'
+icon: 'org.oneal.CrashSentinel.svg'
+source-code: 'https://github.com/we6jbo/CrashSentinel'
+issues: 'https://github.com/we6jbo/CrashSentinel/issues'

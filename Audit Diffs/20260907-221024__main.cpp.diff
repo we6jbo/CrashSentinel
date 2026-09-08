@@ -1,0 +1,51 @@
+# #ju56Us
+# CrashSentinel audited diff
+# destination: main.cpp
+# generated: 2026-09-07T22:10:24-07:00
+
+--- before/main.cpp
++++ after/main.cpp
+@@ -12,6 +12,8 @@
+ #include <QDebug>
+ #include <QDir>
+ #include <QLockFile>
++#include <QTimer>
++#include <csignal>
+ 
+ #include "mainwindow.h"
+ #include "context_provenance.h"
+@@ -19,6 +21,16 @@
+ #include "self_protection.h"
+ #include "state_paths.h"
+ 
++
++namespace {
++volatile std::sig_atomic_t gShutdownSignal = 0;
++
++void handleShutdownSignal(int)
++{
++    gShutdownSignal = 1;
++}
++} // namespace
++
+ // Helper used by the explicit recovery command-line switches.
+ static bool argumentRequested(int argc,
+                               char *argv[],
+@@ -88,6 +100,17 @@
+         QCoreApplication::setApplicationName(QStringLiteral("CrashSentinel"));
+         QCoreApplication::setOrganizationName(QStringLiteral("j03.page"));
+ 
++        std::signal(SIGTERM, handleShutdownSignal);
++        std::signal(SIGINT, handleShutdownSignal);
++
++        QTimer shutdownSignalTimer;
++        shutdownSignalTimer.setInterval(100);
++        QObject::connect(&shutdownSignalTimer, &QTimer::timeout, [&app] {
++            if (gShutdownSignal != 0)
++                app.quit();
++        });
++        shutdownSignalTimer.start();
++
+         CrashMonitor monitor;
+ 
+         const QString serviceStateDir = monitor.publicStateDir();

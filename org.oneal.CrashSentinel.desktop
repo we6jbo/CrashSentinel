@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=CrashSentinel
-Comment=Practice and learn fractions
+Comment=Diagnose unexplained Linux crashes and abrupt reboots
 Exec=CrashSentinel
 Icon=org.oneal.CrashSentinel
 Terminal=false

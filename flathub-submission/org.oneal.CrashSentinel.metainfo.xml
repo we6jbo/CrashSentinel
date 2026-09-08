@@ -1,15 +1,17 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<!-- #ju56Us -->
 <component type="desktop-application">
   <id>org.oneal.CrashSentinel</id>
   <name>CrashSentinel</name>
-  <summary>Practice and learn fractions</summary>
+  <summary>Diagnose unexplained Linux crashes and abrupt reboots</summary>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>Apache-2.0</project_license>
   <description>
-    <p>A desktop application for practicing fraction arithmetic.</p>
+    <p>CrashSentinel is a Qt-based Linux crash-monitoring and recovery-analysis application that records lightweight system evidence, analyzes previous-boot information, provides recovery diagnostics, and includes safeguards designed to reduce the risk of the monitor itself adding pressure to an unstable system.</p>
   </description>
   <launchable type="desktop-id">org.oneal.CrashSentinel.desktop</launchable>
   <categories>
     <category>Education</category>
   </categories>
+  <url type="homepage">https://j03.page/2026/09/07/crash-sentinel/</url>
+  <content_rating type="oars-1.1"/>
 </component>
