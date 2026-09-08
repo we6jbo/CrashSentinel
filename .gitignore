@@ -7,3 +7,7 @@ CMakeCache.txt
 *.o
 *.user
 .audit-state/
+.flatpak-builder/
+build*/
+flathub-submission/
+*.before-*

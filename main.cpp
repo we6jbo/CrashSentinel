@@ -12,12 +12,24 @@
 #include <QDebug>
 #include <QDir>
 #include <QLockFile>
+#include <QTimer>
+#include <csignal>
 
 #include "mainwindow.h"
 #include "context_provenance.h"
 #include "crash_monitor.h"
 #include "self_protection.h"
 #include "state_paths.h"
+
+
+namespace {
+volatile std::sig_atomic_t gShutdownSignal = 0;
+
+void handleShutdownSignal(int)
+{
+    gShutdownSignal = 1;
+}
+} // namespace
 
 // Helper used by the explicit recovery command-line switches.
 static bool argumentRequested(int argc,
@@ -87,6 +99,17 @@ int main(int argc, char *argv[])
         QCoreApplication app(argc, argv);
         QCoreApplication::setApplicationName(QStringLiteral("CrashSentinel"));
         QCoreApplication::setOrganizationName(QStringLiteral("j03.page"));
+
+        std::signal(SIGTERM, handleShutdownSignal);
+        std::signal(SIGINT, handleShutdownSignal);
+
+        QTimer shutdownSignalTimer;
+        shutdownSignalTimer.setInterval(100);
+        QObject::connect(&shutdownSignalTimer, &QTimer::timeout, [&app] {
+            if (gShutdownSignal != 0)
+                app.quit();
+        });
+        shutdownSignalTimer.start();
 
         CrashMonitor monitor;
 
